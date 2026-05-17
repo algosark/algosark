@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Algosark — Strategy Risk Survey</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            'display': ['DM Serif Display', 'Georgia', 'serif'],
+            'body': ['DM Sans', 'system-ui', 'sans-serif'],
+          },
+          colors: {
+            'navy':  { DEFAULT: '#0d1b3e', 700: '#162a5c', 500: '#1e3a7a' },
+            'gold':  { DEFAULT: '#c9972a', light: '#f0c96a', pale: '#fdf6e3' },
+            'slate': { soft: '#f4f6fb', mid: '#e8edf7', dark: '#6b7a99' },
+            'ink':   '#0d1117',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'DM Sans', system-ui, sans-serif;
+      color: #0d1117;
+      background: #f4f6fb;
+      -webkit-font-smoothing: antialiased;
+    }
+    .display-font { font-family: 'DM Serif Display', Georgia, serif; }
+
+    /* ── Shimmer ── */
+    @keyframes shimmer {
+      0%   { background-position: -200% center; }
+      100% { background-position:  200% center; }
+    }
+    .gold-shimmer {
+      background: linear-gradient(90deg, #c9972a 0%, #f0c96a 40%, #c9972a 60%, #f0c96a 100%);
+      background-size: 200% auto;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: shimmer 3s linear infinite;
+    }
+
+    @keyframes fadeUp {
+      from { opacity:0; transform:translateY(20px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+    .animate-fadeup { animation: fadeUp .55s ease both; }
+
+    /* ── Progress bar ── */
+    #progress-fill {
+      transition: width .5s cubic-bezier(.4,0,.2,1);
+      background: linear-gradient(90deg, #c9972a, #f0c96a, #c9972a);
+      background-size: 200% auto;
+      animation: shimmer 2.5s linear infinite;
+    }
+
+    /* ── Section cards ── */
+    .survey-card {
+      background: #fff;
+      border-radius: 20px;
+      border: 1px solid #e8edf7;
+      box-shadow: 0 4px 24px rgba(13,27,62,.06);
+      padding: 2.5rem;
+      display: none;
+    }
+    .survey-card.active { display: block; animation: fadeUp .45s ease both; }
+
+    /* ── Option buttons ── */
+    .opt-btn {
+      display: flex;
+      align-items: center;
+      gap: .85rem;
+      width: 100%;
+      text-align: left;
+      padding: .9rem 1.1rem;
+      border: 1.5px solid #e8edf7;
+      border-radius: 12px;
+      background: #fff;
+      cursor: pointer;
+      font-size: .9rem;
+      font-weight: 500;
+      color: #374151;
+      transition: border-color .2s, background .2s, color .2s, box-shadow .2s;
+      position: relative;
+    }
+    .opt-btn .opt-icon {
+      width: 36px; height: 36px;
+      border-radius: 10px;
+      background: #f4f6fb;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem;
+      flex-shrink: 0;
+      transition: background .2s;
+    }
+    .opt-btn:hover {
+      border-color: #c9972a;
+      background: #fdf6e3;
+      color: #0d1b3e;
+    }
+    .opt-btn:hover .opt-icon { background: rgba(201,151,42,.15); }
+    .opt-btn.selected {
+      border-color: #c9972a;
+      background: rgba(201,151,42,.07);
+      color: #0d1b3e;
+      box-shadow: 0 0 0 3px rgba(201,151,42,.15);
+    }
+    .opt-btn.selected .opt-icon { background: rgba(201,151,42,.18); }
+    .opt-btn.selected::after {
+      content: '\f00c';
+      font-family: 'Font Awesome 6 Free';
+      font-weight: 900;
+      position: absolute;
+      right: 1rem;
+      color: #c9972a;
+      font-size: .8rem;
+    }
+
+    /* ── Multi-select chips ── */
+    .chip-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+      padding: .55rem 1.1rem;
+      border: 1.5px solid #e8edf7;
+      border-radius: 99px;
+      background: #fff;
+      cursor: pointer;
+      font-size: .85rem;
+      font-weight: 500;
+      color: #374151;
+      transition: all .2s;
+    }
+    .chip-btn:hover { border-color: #c9972a; background: #fdf6e3; color: #0d1b3e; }
+    .chip-btn.selected {
+      border-color: #c9972a;
+      background: rgba(201,151,42,.10);
+      color: #0d1b3e;
+      font-weight: 600;
+    }
+
+    /* ── Slider ── */
+    .custom-range {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: #e8edf7;
+      outline: none;
+    }
+    .custom-range::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      background: #c9972a;
+      cursor: pointer;
+      border: 3px solid #fff;
+      box-shadow: 0 2px 8px rgba(201,151,42,.4);
+      transition: transform .2s;
+    }
+    .custom-range::-webkit-slider-thumb:hover { transform: scale(1.15); }
+
+    /* ── Inputs ── */
+    .field-input {
+      width: 100%;
+      padding: .75rem 1rem;
+      border: 1.5px solid #e8edf7;
+      border-radius: 12px;
+      font-size: .9rem;
+      font-family: inherit;
+      color: #0d1117;
+      background: #fff;
+      outline: none;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .field-input:focus {
+      border-color: #c9972a;
+      box-shadow: 0 0 0 3px rgba(201,151,42,.12);
+    }
+    .field-input::placeholder { color: #9ca3af; }
+
+    select.field-input { cursor: pointer; }
+
+    /* ── Buttons ── */
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: #c9972a; color: #fff;
+      font-weight: 600; font-size: .95rem;
+      padding: .85rem 2rem;
+      border-radius: 10px;
+      border: none; cursor: pointer;
+      transition: background .25s, transform .2s, box-shadow .25s;
+      box-shadow: 0 4px 16px rgba(201,151,42,.35);
+    }
+    .btn-primary:hover { background: #b8851f; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(201,151,42,.4); }
+    .btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+    .btn-ghost {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: transparent; color: #6b7a99;
+      font-weight: 500; font-size: .9rem;
+      padding: .85rem 1.5rem;
+      border-radius: 10px;
+      border: 1.5px solid #e8edf7; cursor: pointer;
+      transition: all .2s;
+    }
+    .btn-ghost:hover { border-color: #c9972a; color: #0d1b3e; }
+
+    /* ── Section indicator dots ── */
+    .step-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #e8edf7;
+      transition: all .3s;
+    }
+    .step-dot.done  { background: #c9972a; }
+    .step-dot.active { background: #c9972a; width: 24px; border-radius: 4px; }
+
+    /* ── Section label ── */
+    .section-label {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(201,151,42,.1);
+      border: 1px solid rgba(201,151,42,.25);
+      color: #c9972a;
+      font-size: .7rem; font-weight: 700;
+      letter-spacing: .07em; text-transform: uppercase;
+      padding: .25rem .75rem; border-radius: 99px;
+    }
+
+    /* ── Risk-level meter ── */
+    .risk-bar-seg {
+      height: 8px;
+      border-radius: 4px;
+      flex: 1;
+      transition: opacity .3s;
+    }
+
+    /* ── Nav ── */
+    .nav-link {
+      position: relative; font-weight: 500; color: #374151; transition: color .25s;
+    }
+    .nav-link::after {
+      content: ''; position: absolute; left: 0; bottom: -3px;
+      width: 0; height: 2px; background: #c9972a; transition: width .3s ease;
+    }
+    .nav-link:hover { color: #0d1b3e; }
+    .nav-link:hover::after { width: 100%; }
+
+    /* ── Tooltip ── */
+    .tooltip-wrap { position: relative; }
+    .tooltip-wrap .tooltip-box {
+      display: none;
+      position: absolute; bottom: calc(100% + 8px); left: 0;
+      background: #0d1b3e; color: #fff;
+      font-size: .78rem; padding: .5rem .85rem;
+      border-radius: 8px; white-space: nowrap; z-index: 10;
+    }
+    .tooltip-wrap:hover .tooltip-box { display: block; }
+
+    /* ── Success screen ── */
+    @keyframes scaleIn {
+      from { opacity:0; transform:scale(.85); }
+      to   { opacity:1; transform:scale(1); }
+    }
+    #success-screen { display: none; }
+    #success-screen.show { display: block; animation: scaleIn .5s cubic-bezier(.34,1.56,.64,1) both; }
+
+    /* ── Validation ── */
+    .field-error { border-color: #ef4444 !important; }
+    .err-msg { color: #ef4444; font-size: .78rem; margin-top: .3rem; display: none; }
+    .err-msg.show { display: block; }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<header class="bg-white/95 backdrop-blur border-b border-slate-mid sticky top-0 z-50" style="border-color:#e8edf7;">
+  <div class="max-w-5xl mx-auto px-5 lg:px-8 flex items-center justify-between h-16">
+    <a href="index.html" class="flex items-center gap-2.5 no-underline">
+      <div class="w-9 h-9 rounded-lg bg-navy flex items-center justify-center" style="background:#0d1b3e;">
+        <i class="fas fa-chart-line text-gold text-sm" style="color:#c9972a;"></i>
+      </div>
+      <span class="display-font text-xl text-navy font-normal tracking-tight" style="color:#0d1b3e;">Algos<span style="color:#c9972a;">ark</span></span>
+    </a>
+    <nav class="hidden md:flex items-center gap-6">
+      <a href="index.html" class="nav-link text-sm">Home</a>
+      <a href="pricing.html" class="nav-link text-sm">Pricing</a>
+      <a href="strategy.html" class="nav-link text-sm">Strategy</a>
+    </nav>
+    <div class="flex items-center gap-3 text-sm text-slate-dark" style="color:#6b7a99;">
+      <i class="fas fa-lock text-gold text-xs" style="color:#c9972a;"></i>
+      <span class="hidden sm:inline">Encrypted &amp; Secure</span>
+    </div>
+  </div>
+</header>
+
+<!-- HERO STRIP -->
+<div style="background:linear-gradient(135deg,#0d1b3e 0%,#162a5c 60%,#1e3a7a 100%); padding:3rem 1.5rem 4rem;">
+  <div class="max-w-3xl mx-auto text-center">
+    <span class="section-label mb-4 inline-flex">
+      <i class="fas fa-clipboard-list"></i> Risk &amp; Eligibility Survey
+    </span>
+    <h1 class="display-font text-3xl sm:text-4xl lg:text-5xl text-white mt-4 mb-4 leading-tight">
+      Tell us about you —<br/><em class="gold-shimmer not-italic">we'll build the strategy.</em>
+    </h1>
+    <p class="text-slate-dark text-base max-w-xl mx-auto" style="color:#6b7a99;">
+      This 20-minute questionnaire gives our quant team everything needed to build a bespoke algorithmic strategy tailored precisely to your risk profile and goals.
+    </p>
+    <div class="flex flex-wrap justify-center gap-5 mt-6 text-xs" style="color:#6b7a99;">
+      <span class="flex items-center gap-1.5"><i class="fas fa-clock" style="color:#c9972a;"></i> ~20 minutes</span>
+      <span class="flex items-center gap-1.5"><i class="fas fa-shield-alt" style="color:#c9972a;"></i> Data encrypted</span>
+      <span class="flex items-center gap-1.5"><i class="fas fa-user-lock" style="color:#c9972a;"></i> Never shared or sold</span>
+      <span class="flex items-center gap-1.5"><i class="fas fa-sync" style="color:#c9972a;"></i> Strategy in 24–48 hrs</span>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN CONTAINER -->
+<div class="max-w-3xl mx-auto px-4 lg:px-0 pb-24" style="margin-top:-2rem;">
+
+  <!-- PROGRESS HEADER -->
+  <div class="bg-white rounded-2xl border p-5 mb-6 shadow-sm" style="border-color:#e8edf7;">
+    <div class="flex justify-between items-center mb-3">
+      <div>
+        <div id="section-name" class="font-semibold text-navy text-sm" style="color:#0d1b3e;">Section 1 of 7 — Personal Profile</div>
+        <div id="q-counter" class="text-xs mt-0.5" style="color:#6b7a99;">Question 1 of 35</div>
+      </div>
+      <div id="pct-label" class="display-font text-2xl" style="color:#c9972a;">0%</div>
+    </div>
+    <div class="w-full rounded-full overflow-hidden" style="background:#e8edf7; height:8px;">
+      <div id="progress-fill" style="width:0%; height:100%; border-radius:9999px;"></div>
+    </div>
+    <!-- Step dots -->
+    <div class="flex gap-2 mt-3 items-center">
+      <div class="step-dot active" id="dot-1" title="Personal Profile"></div>
+      <div class="step-dot" id="dot-2" title="Trading Experience"></div>
+      <div class="step-dot" id="dot-3" title="Financial Profile"></div>
+      <div class="step-dot" id="dot-4" title="Risk Tolerance"></div>
+      <div class="step-dot" id="dot-5" title="Strategy Preferences"></div>
+      <div class="step-dot" id="dot-6" title="Technical Preferences"></div>
+      <div class="step-dot" id="dot-7" title="Goals &amp; Constraints"></div>
+      <span class="text-xs ml-auto" style="color:#6b7a99;" id="section-counter">Section 1 / 7</span>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       SECTION 1 — PERSONAL PROFILE
+  ═══════════════════════════════════════ -->
+  <div class="survey-card active" id="sec-1">
+    <div class="section-label mb-5"><i class="fas fa-user-circle"></i> Personal Profile</div>
+    <h2 class="display-font text-2xl text-navy mb-1" style="color:#0d1b3e;">About You</h2>
+    <p class="text-sm mb-7" style="color:#6b7a99;">Basic information so we can personalise your strategy and ensure eligibility.</p>
+
+    <div class="space-y-6">
+
+      <!-- Q1 -->
+      <div>
+        <label class="block font-semibold text-sm text-navy mb-2" style="color:#0d1b3e;">1. Full Name <span style="color:#c9972a;">*</span></label>
+        <input type="text" class="field-input" id="q1" placeholder="e.g. Alex Johnson" />
+        <div class="err-msg" id="err-q1">Please enter your full name.</div>
+      </div>
+
+      <!-- Q2 -->
+      <div>
+        <label class="block font-semibold text-sm text-navy mb-2" style="color:#0d1b3e;">2. Email Address <span style="color:#c9972a;">*</span></label>
+        <input type="email" class="field-input" id="q2" placeholder="e.g. alex@example.com" />
+        <div class="err-msg" id="err-q2">Please enter a valid email.</div>
+      </div>
+
+      <!-- Q3 -->
+      <div>
+        <label class="block font-semibold text-sm text-navy mb-2" style="color:#0d1b3e;">3. Age Range <span style="color:#c9972a;">*</span></label>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3" id="q3">
+          <button class="opt-btn" data-val="18-24"><span class="opt-icon">🎓</span>18 – 24</button>
+          <button class="opt-btn" data-val="25-34"><span class="opt-icon">💼</span>25 – 34</button>
+          <button class="opt-btn" data-val="35-44"><span class="opt-icon">📈</span>35 – 44</button>
+          <button class="opt-btn" data-val="45-54"><span class="opt-icon">🏦</span>45 – 54</button>
+          <button class="opt-btn" data-val="55-64"><span class="opt-icon">🏡</span>55 – 64</button>
+          <button class="opt-btn" data-val="65+"><span class="opt-icon">🎯</span>65+</button>
+        </div>
+        <div class="err-msg" id="err-q3">Please select your age range.</div>
+      </div>
+
+      <!-- Q4 -->
+      <div>
+        <label class="block font-semibold text-sm text-navy mb-2" style="color:#0d1b3e;">4. Country of Residence <span style="color:#c9972a;">*</span></label>
+        <select class="field-input" id="q4">
+          <option value="">Select country…</option>
+          <option value="GB">United Kingdom</option>
+          <option value="IE">Ireland</option>
+          <option value="US">United States</option>
+          <option value="other">Other</option>
+        </select>
+        <div class="err-msg" id="err-q4">Please select your country.</div>
+      </div>
+
+      <!-- Q5 -->
+      <div>
+        <label class="block font-semibold text-sm text-navy mb-2" style="color:#0d1b3e;">5. Employment Status</label>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3" id="q5">
+          <button class="opt-btn" data-val="employed"><span class="opt-icon">👔</span>Employed</button>
+          <button class="opt-btn" data-val="self-employed"><span class="opt-icon">💡</span>Self-Employed</button>
+          <button class="opt-btn" data-val="student"><span class="opt-icon">📚</span>Student</button>
+          <button class="opt-btn" data-val="retired"><span class="opt-icon">🌴</span>Retired</button>
+          <button class="opt-btn" data-val="unemployed"><span class="opt-icon">🔍</span>Unemployed</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       SECTION 2 — TRADING EXPERIENCE
+  ═══════════════════════════════════════ -->
+  <div class="survey-card" id="sec-2">
+    <div class="section-label mb-5"><i class="fas fa-chart-bar"></i> Trading Experience</div>
+    <h2 class="display-font text-2xl text-navy mb-1" style="color:#0d1b3e;">Your Trading Background</h2>
+    <p class="text-sm mb-7" style="color:#6b7a99;">Understanding your experience helps calibrate strategy complexity and risk parameters.</p>
+
+    <div class="space-y-6">
+
+      <!-- Q6 -->
+      <div>
+        <label class="block font-semibold text-sm text-navy mb-2" style="color:#0d1b3e;">6. How long have you been trading? <span style="color:#c9972a;">*</span></label>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" id="q6">
+          <button class="opt-btn" data-val="none"><span class="opt-icon">🌱</span>I'm brand new — no live trading yet</button>
+          <button class="opt-btn" data-val="<1yr"><span class="opt-icon">📅</span>Less than 1 year</button>
+          <button class="opt-btn" data-val="1-3yr"><span class="opt-icon">📆</span>1 – 3 years</button>
+          <button class="opt-btn" data-val="3-5yr"><span class="opt-icon">🗓️</span>3 – 5 years</button>
+          <button class="opt-btn" data-val="5-10yr"><span class="opt-icon">📊</span>5 – 10 years</button>
+          <button class="opt-btn" data-val="10yr+"><span class="opt-icon">🏆</span>10+ years</button>
+        </div>
+        <div class="err-msg" id="err-q6">Please select your trading experience.</div>
+      </div>
+
+      <!-- Q7 -->
+      <div>
+        <label class="block font-semibold text-sm text-navy mb-2" style="color:#0d1b3e;">7. Which asset classes do you currently trade or have experience with? <span class="text-xs font-normal" style="color:#6b7a99;">(select all that apply)</span></label>
+        <div class="flex flex-wrap gap-2" id="q7">
+          <button class="chip-btn" data-val="equities"><i class="fas fa-building-columns"></i> Equities / Stocks</button>
+          <button class="chip-btn" data-val="forex"><i class="fas fa-exchange-alt"></i> Forex / FX</button>
+          <button class="chip-btn" data-val="crypto"><i class="fab fa-bitcoin"></i> Cryptocurrency</button>
+          <button class="chip-btn" data-val="commodities"><i class="fas fa-oil-can"></i> Commodities</button>
+          <button class="chip-btn" data-val="indices"><i class="fas fa-chart-area"></i> Indices</button>
+          <button class="chip-btn" data-val="etfs"><i class="fas fa-layer-group"></i> ETFs</button>
+          <button class="chip-btn" data-val="options"><i class="fas fa-sliders-h"></i> Options</button>
+          <button class="chip-btn" data-val="futures"><i class="fas fa-clock-rotate-left"></i> Futures</button>
+          <button class="chip-btn" data-val="none"><i class="fas fa-times"></i> None yet</button>
+        </div>
+      </div>
+
+      <!-- Q8 -->
+      <div>
+        <label class="block font-semibold text-sm text-navy mb-2" style="color:#0d1b3e;">8. How familiar are you with algorithmic / automated trading?</label>
+        <div class="grid grid-cols-1 gap-3" id="q8">
+          <button class="opt-btn" data-val="none"><span class="opt-icon">❓</span>Not familiar — I've just heard the term</button>
+          <button class="opt-btn" data-val="basic"><span class="opt-icon">📖</span>Basic — I understand the concept but haven't used it</button>
+          <button class="opt-btn" data-val="intermediate"><span class="opt-icon">⚙️</span>Intermediate — I've paper-traded or tested algos</button>
+          <button class="opt-btn" data-val="advanced"><span class="opt-icon">🚀</span>Advanced — I've used live algo strategies before</button>
+        </div>
+      </div>
+
+      <!-- Q9 -->
+      <div>
+        <label class="block font-semibold text-sm text-navy mb-2" style="color:#0d1b3e;">9. Do you have coding or quantitative finance knowledge?</label>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" id="q9">
+          <button class="opt-btn" data-val="none"><span class="opt-icon">🙅</span>No coding or quant knowledge</button>
+          <button class="opt-btn" data-val="basic-code"><span class="opt-icon">💻</span>Basic coding (e.g. Python basics)</button>
+          <button class="opt-btn" data-val="advanced-code"><span class="opt-icon">🧑‍💻</span>Proficient coder / developer</button>
+          <button class="opt-btn" data-val="quant"><span class="opt-icon">🎓</span>Quant / mathematics background</button>
+        </div>
+      </div>
+
+      <!-- Q10 -->
+      <div>
+        <label class="block font-semibold text-sm text-navy mb-2" style="color:#0d1b3e;">10. How often do you currently trade?</label>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3" id="q10">
+          <button class="opt-btn" data-val="never"><span class="opt-icon">⏳</span>Never / not yet</button>
+          <button class="opt-btn" data-val="monthly"><span class="opt-icon">📅</span>A few times a month</button>
+          <button class="opt-btn" data-val="weekly"><span class="opt-icon">📆</span>Weekly</button>
+          <button class="opt-btn" data-val="daily"><span class="opt-icon">🔁</span>Daily</button>
+          <button class="opt-btn" data-val="intraday"><span class="opt-icon">⚡</span>Multiple times a day</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       SECTION 3 — FINANCIAL PROFILE
+  ═══════════════════════════════════════ -->
+  <div class="survey-card" id="sec-3">
+    <div class="section-label mb-5"><i class="fas fa-sterling-sign"></i> Financial Profile</div>
+    <h2 class="display-font text-2xl text-navy mb-1" style="color:#0d1b3e;">Your Capital &amp; Finances</h2>
+    <p class="text-sm mb-7" style="color:#6b7a99;">All data is encrypted. This shapes position-sizing and capital allocation within your strategy.</p>
+
+    <div class="space-y-6">
+
+      <!-- Q11 -->
+      <div>
+        <label class="block font-semibold text-sm text-navy mb-2" style="color:#0d1b3e;">11. What is your approximate annual net income? <span style="color:#c9972a;">*</span></label>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" id="q11">
+          <button class="opt-btn" data-val="<20k"><span class="opt-icon">💷</span>Under £20,000</button>
+          <button class="opt-btn" data-val="20-40k"><span class="opt-icon">💷</span>£20,000 – £40,000</button>
+          <button class="opt-btn" data-val="40-80k"><span class="opt-icon">💷</span>£40,000 – £80,000</button>
+          <button class="opt-btn" data-val="80-150k"><span class="opt-icon">💷</span>£80,000 – £150,000</button>
+          <button class="opt-btn" data-val="150k+"><span class="opt-icon">💷</span>£150,000+</button>
+          <button class="opt-btn" data-val="prefer-not"><span class="opt-icon">🔒</span>Prefer not to say</button>
+        </div>
+        <div class="err-msg" id="err-q11">Please select an income band.</div>
+      </div>
+
+      <!-- Q12 -->
+      <div>
+        <label class="block font-semibold text-sm text-navy mb-2" style="color:#0d1b3e;">12. What is your approximate total investable net worth (excluding primary home)? <span style="color:#c9972a;">*</span></label>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" id="q12">
+          <button class="opt-btn" data-val="<10k"><span class="opt-icon">💰</span>Under £10,000</button>
+          <button class="opt-btn" data-val="10-50k"><span class="opt-icon">💰</span>£10,000 – £50,000</button>
+          <button class="opt-btn" data-val="50-200k"><span class="opt-icon">💰</span>£50,000 – £200,000</button>
+          <button class="opt-btn" data-val="200-500k"><span class="opt-icon">💰</span>£200,000 – £500,000</button>
+          <button class="opt-btn" data-val="500k+"><span class="opt-icon">💰</span>£500,000+</button>
+          <button class="opt-btn" data-val="prefer-not"><span class="opt-icon">🔒</span>Prefer not to say</button>
+        </div>
+        <div class="err-msg" id="err-q12">Please select a net worth band.</div>
+      </div>
+
+      <!-- Q13 -->
+      <div>
+        <label class="block font-semibold text-sm text-navy mb-2" style="color:#0d1b3e;">13. How much capital are you intending to deploy with your algorithmic strategy initially? <span style="color:#c9972a;">*</span></label>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" id="q13">
+          <button class="opt-btn" data-val="<1k"><span class="opt-icon">🪙</span>Under £1,000</button>
+          <button class="opt-btn" data-val="1-5k"><span class="opt-icon">💵</span>£1,000 – £5,000</button>
+          <button class="opt-btn" data-val="5-20k"><span class="opt-icon">💵</span>£5,000 – £20,000</button>
+          <button class="opt-btn" data-val="20-100k"><span class="opt-icon">💵</span>£20,000 – £100,000</button>
+          <button class="opt-btn" data-val="100k+"><span class="opt-icon">💵</span>£100,000+</button>
+        </div>
+        <div class="err-msg" id="err-q13">Please select your initial capital.</div>
+      </div>
+
+      <!-- Q14 -->
+      <div>
+        <label class="block font-semibold text-sm text-navy mb-2" style="color:#0d1b3e;">14. Do you have outstanding debts or financial obligations that could affect your ability to trade?</label>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3" id="q14">
+          <button class="opt-btn" data-val="no"><span class="opt-icon">✅</span>No significant debts</button>
+          <button class="opt-btn" data-val="minor"><span class="opt-icon">⚠️</span>Minor debts (mortgage, car)</button>
+          <button class="opt-btn" data-val="significant"><span class="opt-icon">❗</span>Significant debts</button>
+        </div>
+      </div>
+
+      <!-- Q15 -->
+      <div>
+        <label class="block font-semibold text-sm text-navy mb-2" style="color:#0d1b3e;">15. Do you have an emergency fund covering at least 3 months of expenses separate from this capital?</label>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" id="q15">
+          <button class="opt-btn" data-val="yes"><span class="opt-icon">✅</span>Yes — separate emergency fund exists</button>
+          <button class="opt-btn" data-val="partial"><span class="opt-icon">⚠️</span>Partially — less than 3 months</button>
+          <button class="opt-btn" data-val="no"><span class="opt-icon">❌</span>No emergency fund</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       SECTION 4 — RISK TOLERANCE
+  ═══════════════════════════════════════ -->
+  <div class="survey-card" id="sec-4">
+    <div class="section-label mb-5"><i class="fas fa-shield-halved"></i> Risk Tolerance</div>
+    <h2 class="display-font text-2xl text-navy mb-1" style="color:#0d1b3e;">How Much Risk Can You Take?</h2>
+    <p class="text-sm mb-7" style="color:#6b7a99;">This section is the most critical for strategy calibration. Answer honestly — conservative is never wrong.</p>
+
+    <div class="space-y-6">
+
+      <!-- Q16 — slider -->
+      <div>
+        <label class="block font-semibold text-sm text-navy mb-1" style="color:#0d1b3e;">16. What is the maximum percentage of your trading capital you could accept losing in a single month before you would stop the strategy? <span style="color:#c9972a;">*</span></label>
+        <p class="text-xs mb-4" style="color:#6b7a99;">Drag the slider to set your monthly loss limit</p>
+        <div class="flex items-center gap-4">
+          <input type="range" class="custom-range flex-1" id="q16" min="1" max="50" value="15" step="1" />
+          <div class="font-bold text-2xl display-font min-w-[4rem] text-right" id="q16-label" style="color:#c9972a;">15%</div>
+        </div>
+        <!-- Risk colour bar -->
+        <div class="flex gap-1 mt-3">
+          <div class="risk-bar-seg" style="background:#22c55e;" id="rb1"></div>
+          <div class="risk-bar-seg" style="background:#86efac;" id="rb2"></div>
+          <div class="risk-bar-seg" style="background:#fbbf24;" id="rb3"></div>
+          <div class="risk-bar-seg" style="background:#f97316;" id="rb4"></div>
+          <div class="risk-bar-seg" style="background:#ef4444;" id="rb5"></div>
+        </div>
+        <div class="flex justify-between text-xs mt-1" style="color:#6b7a99;">
+          <span>Conservative</span><span>Moderate</span><span>Aggressive</span>
+        </div>
+      </div>
+
+      <!-- Q17 -->
+      <div>
+        <label class="block font-semibold text-sm text-navy mb-2" style="color:#0d1b3e;">17. How would you react if your strategy lost 20% of its value over one month? <span style="color:#c9972a;">*</span></label>
+        <div class="grid grid-cols-1 gap-3" id="q17">
+          <button class="opt-btn" data-val="stop"><span class="opt-icon">🛑</span>Stop immediately — this is not acceptable to me</button>
+          <button class="opt-btn" data-val="review"><span class="opt-icon">🔍</span>Review and likely pause while assessing the cause</button>
+          <button class="opt-btn" data-val="continue"><span class="opt-icon">⚖️</span>Continue if consistent with the strategy's projected drawdown</button>
+          <button class="opt-btn" data-val="add-more"><span class="opt-icon">📈</span>Continue and possibly add more capital — I see this as a buying opportunity</button>
+        </div>
+        <div class="err-msg" id="err-q17">Please select a response.</div>
+      </div>
+
+      <!-- Q18 -->
+      <div>
+        <label class="block font-semibold text-sm text-navy mb-2" style="color:#0d1b3e;">18. What return profile best describes your goal? <span style="color:#c9972a;">*</span></label>
+        <div class="grid grid-cols-1 gap-3" id="q18">
+          <button class="opt-btn" data-val="capital-pres"><span class="opt-icon">🛡️</span><div><div class="font-semibold">Capital Preservation</div><div class="text-xs font-normal" style="color:#6b7a99;">Aim to protect capital. Accept low returns in exchange for minimal drawdown.</div></div></button>
+          <button class="opt-btn" data-val="income"><span class="opt-icon">💸</span><div><div class="font-semibold">Income Generation</div><div class="text-xs font-normal" style="color:#6b7a99;">Steady monthly returns, moderate risk, max ~10% drawdown.</div></div></button>
+          <button class="opt-btn" data-val="growth"><span class="opt-icon">🌱</span><div><div class="font-semibold">Balanced Growth</div><div class="text-xs font-normal" style="color:#6b7a99;">Target 20–40% annual returns. Accept up to 20% drawdown.</div></div></button>
+          <button class="opt-btn" data-val="aggressive"><span class="opt-icon">🔥</span><div><div class="font-semibold">Aggressive Growth</div><div class="text-xs font-normal" style="color:#6b7a99;">Target 40%+ annual. Accept significant drawdowns of 30–50%.</div></div></button>
+        </div>
+        <div class="err-msg" id="err-q18">Please select a return profile.</div>
+      </div>
+
+      <!-- Q19 -->
+      <div>
+        <label class="block font-semibold text-sm text-navy mb-2" style="color:#0d1b3e;">19. What is your investment time horizon for this strategy?</label>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3" id="q19">
+          <button class="opt-btn" data-val="<6mo"><span class="opt-icon">📅</span>Under 6 months</button>
+          <button class="opt-btn" data-val="6-12mo"><span class="opt-icon">📆</span>6 – 12 months</button>
+          <button class="opt-btn" data-val="1-3yr"><span class="opt-icon">🗓️</span>1 – 3 years</button>
+          <button class="opt-btn" data-val="3-5yr"><span class="opt-icon">📊</span>3 – 5 years</button>
+          <button class="opt-btn" data-val="5yr+"><span class="opt-icon">🏆</span>5+ years</button>
+        </div>
+      </div>
+
+      <!-- Q20 -->
+      <div>
+        <label class="block font-semibold text-sm text-navy mb-2" style="color:#0d1b3e;">20. Have you previously experienced significant investment losses (>20% of portfolio)? If so, how did you respond?</label>
+        <div class="grid grid-cols-1 gap-3" id="q20">
+          <button class="opt-btn" data-val="no-exp"><span class="opt-icon">🆕</span>I have not yet experienced this</button>
+          <button class="opt-btn" data-val="sold"><span class="opt-icon">🏃</span>I sold/exited to stop further losses</button>
+          <button class="opt-btn" data-val="held"><span class="opt-icon">✊</span>I held and waited for recovery</button>
+          <button class="opt-btn" data-val="bought-more"><span class="opt-icon">🛒</span>I bought more at the lower price</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       SECTION 5 — STRATEGY PREFERENCES
+  ═══════════════════════════════════════ -->
+  <div class="survey-card" id="sec-5">
+    <div class="section-label mb-5"><i class="fas fa-route"></i> Strategy Preferences</div>
+    <h2 class="display-font text-2xl text-navy mb-1" style="color:#0d1b3e;">What Kind of Strategy Do You Want?</h2>
+    <p class="text-sm mb-7" style="color:#6b7a99;">These preferences feed directly into the strategy design — be as specific as you like.</p>
+
+    <div class="space-y-6">
+
+      <!-- Q21 -->
+      <div>
+        <label class="block font-semibold text-sm text-navy mb-2" style="color:#0d1b3e;">21. Which markets should your strategy target? <span class="text-xs font-normal" style="color:#6b7a99;">(select all that apply)</span></label>
+        <div class="flex flex-wrap gap-2" id="q21">
+          <button class="chip-btn" data-val="uk-equities"><i class="fas fa-flag"></i> UK Equities (FTSE)</button>
+          <button class="chip-btn" data-val="us-equities"><i class="fas fa-flag-usa"></i> US Equities (S&P 500)</button>
+          <button class="chip-btn" data-val="forex"><i class="fas fa-exchange-alt"></i> Forex Pairs</button>
+          <button class="chip-btn" data-val="crypto"><i class="fab fa-bitcoin"></i> Crypto</button>
+          <button class="chip-btn" data-val="commodities"><i class="fas fa-oil-can"></i> Commodities</button>
+          <button class="chip-btn" data-val="indices"><i class="fas fa-chart-area"></i> Global Indices</button>
+          <button class="chip-btn" data-val="no-pref"><i class="fas fa-random"></i> No preference — quant team decides</button>
+        </div>
+      </div>
+
+      <!-- Q22 -->
+      <div>
+        <label class="block font-semibold text-sm text-navy mb-2" style="color:#0d1b3e;">22. Preferred trading style / timeframe</label>
+        <div class="grid grid-cols-1 gap-3" id="q22">
+          <button class="opt-btn" data-val="scalping"><span class="opt-icon">⚡</span><div><div class="font-semibold">Scalping</div><div class="text-xs font-normal" style="color:#6b7a99;">Many trades per day, seconds to minutes each. Highest activity.</div></div></button>
+          <button class="opt-btn" data-val="day-trading"><span class="opt-icon">☀️</span><div><div class="font-semibold">Day Trading</div><div class="text-xs font-normal" style="color:#6b7a99;">Open and close within the same session. No overnight positions.</div></div></button>
+          <button class="opt-btn" data-val="swing"><span class="opt-icon">📊</span><div><div class="font-semibold">Swing Trading</div><div class="text-xs font-normal" style="color:#6b7a99;">Hold positions for days to weeks. Captures medium-term moves.</div></div></button>
+          <button class="opt-btn" data-val="position"><span class="opt-icon">🏔️</span><div><div class="font-semibold">Position / Trend Trading</div><div class="text-xs font-normal" style="color:#6b7a99;">Weeks to months. Fewer trades, bigger moves.</div></div></button>
+          <button class="opt-btn" data-val="no-pref"><span class="opt-icon">🤖</span><div><div class="font-semibold">No Preference — let the ML decide</div><div class="text-xs font-normal" style="color:#6b7a99;">Our system will optimise the timeframe based on your risk profile.</div></div></button>
+        </div>
+      </div>
+
+      <!-- Q23 -->
+      <div>
+        <label class="block font-semibold text-sm text-navy mb-2" style="color:#0d1b3e;">23. Are there any sectors, companies, or asset types you wish to <strong>exclude</strong> from your strategy for ethical or personal reasons?</label>
+        <textarea class="field-input" id="q23" rows="3" placeholder="e.g. No tobacco stocks, no fossil fuel companies, no cryptocurrency…"></textarea>
+      </div>
+
+      <!-- Q24 -->
+      <div>
+        <label class="block font-semibold text-sm text-navy mb-2" style="color:#0d1b3e;">24. Should the strategy use leverage (borrowing to increase position size)?</label>
+        <div class="grid grid-cols-1 gap-3" id="q24">
+          <button class="opt-btn" data-val="no-leverage"><span class="opt-icon">🚫</span>No leverage — trade only with my actual capital</button>
+          <button class="opt-btn" data-val="low-2x"><span class="opt-icon">⚖️</span>Low leverage — up to 2× only</button>
+          <button class="opt-btn" data-val="moderate-5x"><span class="opt-icon">📊</span>Moderate — up to 5×</button>
+          <button class="opt-btn" data-val="high-10x+"><span class="opt-icon">🔥</span>High — 10× or above (I fully understand the risks)</button>
+          <button class="opt-btn" data-val="quant-decides"><span class="opt-icon">🤖</span>Let the quant team decide based on my risk profile</button>
+        </div>
+      </div>
+
+      <!-- Q25 -->
+      <div>
+        <label class="block font-semibold text-sm text-navy mb-2" style="color:#0d1b3e;">25. Do you have a preference for long-only, short-only, or long/short strategies?</label>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3" id="q25">
+          <button class="opt-btn" data-val="long-only"><span class="opt-icon">⬆️</span>Long only</button>
+          <button class="opt-btn" data-val="short-only"><span class="opt-icon">⬇️</span>Short only</button>
+          <button class="opt-btn" data-val="long-short"><span class="opt-icon">↕️</span>Long / Short</button>
+          <button class="opt-btn" data-val="no-pref"><span class="opt-icon">🤖</span>No preference</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       SECTION 6 — TECHNICAL PREFERENCES
+  ═══════════════════════════════════════ -->
+  <div class="survey-card" id="sec-6">
+    <div class="section-label mb-5"><i class="fas fa-microchip"></i> Technical Preferences</div>
+    <h2 class="display-font text-2xl text-navy mb-1" style="color:#0d1b3e;">Platform &amp; Execution Setup</h2>
+    <p class="text-sm mb-7" style="color:#6b7a99;">Technical details that ensure your strategy can execute correctly with your brokerage.</p>
+
+    <div class="space-y-6">
+
+      <!-- Q26 -->
+      <div>
+        <label class="block font-semibold text-sm text-navy mb-2" style="color:#0d1b3e;">26. Which brokerage account(s) do you currently hold or plan to use? <span class="text-xs font-normal" style="color:#6b7a99;">(select all that apply)</span></label>
+        <div class="flex flex-wrap gap-2" id="q26">
+          <button class="chip-btn" data-val="interactive-brokers">Interactive Brokers</button>
+          <button class="chip-btn" data-val="alpaca">Alpaca</button>
+          <button class="chip-btn" data-val="ig">IG Group</button>
+          <button class="chip-btn" data-val="cmc">CMC Markets</button>
+          <button class="chip-btn" data-val="saxo">Saxo Bank</button>
+          <button class="chip-btn" data-val="hargreaves">Hargreaves Lansdown</button>
+          <button class="chip-btn" data-val="trading212">Trading 212</button>
+          <button class="chip-btn" data-val="other-broker">Other</button>
+          <button class="chip-btn" data-val="none-yet">Don't have one yet</button>
+        </div>
+      </div>
+
+      <!-- Q27 -->
+      <div>
+        <label class="block font-semibold text-sm text-navy mb-2" style="color:#0d1b3e;">27. What type of account are you planning to trade in?</label>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3" id="q27">
+          <button class="opt-btn" data-val="isa"><span class="opt-icon">🏦</span>Stocks &amp; Shares ISA</button>
+          <button class="opt-btn" data-val="sipp"><span class="opt-icon">🏛️</span>SIPP / Pension</button>
+          <button class="opt-btn" data-val="gia"><span class="opt-icon">📋</span>General Investment Account</button>
+          <button class="opt-btn" data-val="cfd"><span class="opt-icon">⚡</span>CFD / Spread Bet</button>
+          <button class="opt-btn" data-val="unsure"><span class="opt-icon">❓</span>Unsure</button>
+        </div>
+      </div>
+
+      <!-- Q28 -->
+      <div>
+        <label class="block font-semibold text-sm text-navy mb-2" style="color:#0d1b3e;">28. How comfortable are you connecting a brokerage API to an automated system?</label>
+        <div class="grid grid-cols-1 gap-3" id="q28">
+          <button class="opt-btn" data-val="not-comfortable"><span class="opt-icon">😟</span>Not comfortable — I'll need step-by-step guidance</button>
+          <button class="opt-btn" data-val="somewhat"><span class="opt-icon">🙂</span>Somewhat — I can follow a guide</button>
+          <button class="opt-btn" data-val="comfortable"><span class="opt-icon">😊</span>Comfortable — I've used APIs before</button>
+          <button class="opt-btn" data-val="very-comfortable"><span class="opt-icon">🛠️</span>Very comfortable — no hand-holding needed</button>
+        </div>
+      </div>
+
+      <!-- Q29 -->
+      <div>
+        <label class="block font-semibold text-sm text-navy mb-2" style="color:#0d1b3e;">29. Do you require the strategy to operate during specific trading sessions only?</label>
+        <div class="flex flex-wrap gap-2" id="q29">
+          <button class="chip-btn" data-val="london">London Session (8am–4pm GMT)</button>
+          <button class="chip-btn" data-val="new-york">New York Session (1pm–9pm GMT)</button>
+          <button class="chip-btn" data-val="asia">Asia Session (12am–8am GMT)</button>
+          <button class="chip-btn" data-val="overlap">London/NY Overlap</button>
+          <button class="chip-btn" data-val="all-hours">24/7 (Crypto / Forex)</button>
+          <button class="chip-btn" data-val="no-pref">No preference — optimise freely</button>
+        </div>
+      </div>
+
+      <!-- Q30 -->
+      <div>
+        <label class="block font-semibold text-sm text-navy mb-2" style="color:#0d1b3e;">30. Should the strategy avoid holding positions overnight or over weekends?</label>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3" id="q30">
+          <button class="opt-btn" data-val="no-overnight"><span class="opt-icon">🌙</span>No overnight positions</button>
+          <button class="opt-btn" data-val="no-weekend"><span class="opt-icon">📅</span>No weekend positions</button>
+          <button class="opt-btn" data-val="both-ok"><span class="opt-icon">✅</span>Both are fine</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       SECTION 7 — GOALS & CONSTRAINTS
+  ═══════════════════════════════════════ -->
+  <div class="survey-card" id="sec-7">
+    <div class="section-label mb-5"><i class="fas fa-bullseye"></i> Goals &amp; Constraints</div>
+    <h2 class="display-font text-2xl text-navy mb-1" style="color:#0d1b3e;">Your Goals &amp; Final Details</h2>
+    <p class="text-sm mb-7" style="color:#6b7a99;">The final stretch — your answers here let our quant team add the finishing touches.</p>
+
+    <div class="space-y-6">
+
+      <!-- Q31 -->
+      <div>
+        <label class="block font-semibold text-sm text-navy mb-2" style="color:#0d1b3e;">31. What is your primary motivation for using algorithmic trading? <span style="color:#c9972a;">*</span></label>
+        <div class="grid grid-cols-1 gap-3" id="q31">
+          <button class="opt-btn" data-val="remove-emotion"><span class="opt-icon">🧘</span>Remove emotion from trading decisions</button>
+          <button class="opt-btn" data-val="passive-income"><span class="opt-icon">💸</span>Generate a passive income stream</button>
+          <button class="opt-btn" data-val="supplement"><span class="opt-icon">➕</span>Supplement my existing manual trading</button>
+          <button class="opt-btn" data-val="learn"><span class="opt-icon">📖</span>Learn about algorithmic strategies</button>
+          <button class="opt-btn" data-val="grow-wealth"><span class="opt-icon">📈</span>Grow long-term wealth faster than passive investing</button>
+        </div>
+        <div class="err-msg" id="err-q31">Please select your primary motivation.</div>
+      </div>
+
+      <!-- Q32 -->
+      <div>
+        <label class="block font-semibold text-sm text-navy mb-2" style="color:#0d1b3e;">32. What is your target annual return expectation? <span style="color:#c9972a;">*</span></label>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3" id="q32">
+          <button class="opt-btn" data-val="5-10%"><span class="opt-icon">🔵</span>5–10%</button>
+          <button class="opt-btn" data-val="10-25%"><span class="opt-icon">🟢</span>10–25%</button>
+          <button class="opt-btn" data-val="25-50%"><span class="opt-icon">🟡</span>25–50%</button>
+          <button class="opt-btn" data-val="50-100%"><span class="opt-icon">🟠</span>50–100%</button>
+          <button class="opt-btn" data-val="100%+"><span class="opt-icon">🔴</span>100%+</button>
+          <button class="opt-btn" data-val="no-pref"><span class="opt-icon">🤖</span>Let the quant team decide</button>
+        </div>
+        <div class="err-msg" id="err-q32">Please select a target return.</div>
+      </div>
+
+      <!-- Q33 -->
+      <div>
+        <label class="block font-semibold text-sm text-navy mb-2" style="color:#0d1b3e;">33. How many open positions are you comfortable running simultaneously?</label>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3" id="q33">
+          <button class="opt-btn" data-val="1"><span class="opt-icon">1️⃣</span>Just 1</button>
+          <button class="opt-btn" data-val="2-5"><span class="opt-icon">🔢</span>2 – 5</button>
+          <button class="opt-btn" data-val="5-20"><span class="opt-icon">📊</span>5 – 20</button>
+          <button class="opt-btn" data-val="20+"><span class="opt-icon">🏗️</span>20+</button>
+        </div>
+      </div>
+
+      <!-- Q34 -->
+      <div>
+        <label class="block font-semibold text-sm text-navy mb-2" style="color:#0d1b3e;">34. Are there any additional constraints or special instructions for your strategy? <span class="text-xs font-normal" style="color:#6b7a99;">(optional)</span></label>
+        <textarea class="field-input" id="q34" rows="4" placeholder="e.g. Must avoid earnings announcement periods. Maximum 3 trades per day. Use trailing stops only. Prefer mean-reversion over trend-following. Happy to discuss any specific ideas…"></textarea>
+      </div>
+
+      <!-- Q35 — Declaration -->
+      <div class="rounded-2xl p-5" style="background:rgba(201,151,42,.06); border:1.5px solid rgba(201,151,42,.2);">
+        <h4 class="font-semibold text-navy text-sm mb-3" style="color:#0d1b3e;"><i class="fas fa-file-signature text-gold mr-2" style="color:#c9972a;"></i>35. Declarations &amp; Consent <span style="color:#c9972a;">*</span></h4>
+        <div class="space-y-3">
+          <label class="flex items-start gap-3 cursor-pointer group">
+            <input type="checkbox" id="decl1" class="mt-0.5 w-4 h-4 accent-amber-500 flex-shrink-0" />
+            <span class="text-sm" style="color:#374151;">I confirm that I am trading with <strong>risk capital</strong> only — money I can afford to lose without affecting my lifestyle.</span>
+          </label>
+          <label class="flex items-start gap-3 cursor-pointer group">
+            <input type="checkbox" id="decl2" class="mt-0.5 w-4 h-4 accent-amber-500 flex-shrink-0" />
+            <span class="text-sm" style="color:#374151;">I understand that <strong>past performance is not indicative of future results</strong> and that all trading involves risk.</span>
+          </label>
+          <label class="flex items-start gap-3 cursor-pointer group">
+            <input type="checkbox" id="decl3" class="mt-0.5 w-4 h-4 accent-amber-500 flex-shrink-0" />
+            <span class="text-sm" style="color:#374151;">I consent to Algosark using my survey responses to build and operate my personalised strategy, in line with their <a href="#" style="color:#c9972a;" class="hover:underline">Privacy Policy</a>.</span>
+          </label>
+          <label class="flex items-start gap-3 cursor-pointer group">
+            <input type="checkbox" id="decl4" class="mt-0.5 w-4 h-4 accent-amber-500 flex-shrink-0" />
+            <span class="text-sm" style="color:#374151;">I confirm that I am over 18 years old and a UK resident (or eligible to access this service).</span>
+          </label>
+        </div>
+        <div class="err-msg" id="err-decl">You must agree to all declarations to proceed.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SUCCESS SCREEN -->
+  <div id="success-screen" class="survey-card">
+    <div class="text-center py-8">
+      <div class="w-20 h-20 rounded-full mx-auto mb-6 flex items-center justify-center" style="background:rgba(34,197,94,.1);">
+        <i class="fas fa-check text-green-500 text-3xl"></i>
+      </div>
+      <div class="section-label mx-auto mb-4 justify-center" style="display:inline-flex;">
+        <i class="fas fa-paper-plane"></i> Survey Submitted
+      </div>
+      <h2 class="display-font text-3xl text-navy mb-3" style="color:#0d1b3e;">You're all set — thank you!</h2>
+      <p class="text-gray-600 max-w-md mx-auto mb-8 text-sm leading-relaxed">
+        Our quant team will build and backtest your bespoke algorithmic strategy using your responses. You'll receive access to your paper trading dashboard within <strong>24 – 48 hours</strong>.
+      </p>
+      <!-- Summary box -->
+      <div class="rounded-2xl p-5 text-left max-w-sm mx-auto mb-8" style="background:#f4f6fb; border:1px solid #e8edf7;">
+        <div class="text-xs font-bold uppercase tracking-widest mb-3" style="color:#6b7a99;">What happens next</div>
+        <ul class="space-y-3">
+          <li class="flex gap-3 text-sm">
+            <div class="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-xs text-white" style="background:#c9972a;">1</div>
+            <span style="color:#374151;">Quant team analyses your risk profile &amp; preferences</span>
+          </li>
+          <li class="flex gap-3 text-sm">
+            <div class="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-xs text-white" style="background:#0d1b3e;">2</div>
+            <span style="color:#374151;">ML pipeline generates &amp; backtests your strategy</span>
+          </li>
+          <li class="flex gap-3 text-sm">
+            <div class="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-xs text-white" style="background:#0d1b3e;">3</div>
+            <span style="color:#374151;">You receive dashboard access via email within 48 hrs</span>
+          </li>
+          <li class="flex gap-3 text-sm">
+            <div class="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-xs text-white" style="background:#c9972a;">4</div>
+            <span style="color:#374151;">Paper trade — then go live when you're confident</span>
+          </li>
+        </ul>
+      </div>
+      <a href="index.html" class="btn-primary">
+        <i class="fas fa-home text-sm"></i> Back to Home
+      </a>
+    </div>
+  </div>
+
+  <!-- NAVIGATION BUTTONS -->
+  <div class="flex justify-between items-center mt-6" id="nav-btns">
+    <button class="btn-ghost" id="btn-prev" style="display:none;">
+      <i class="fas fa-arrow-left text-xs"></i> Previous
+    </button>
+    <div class="ml-auto">
+      <button class="btn-primary" id="btn-next">
+        Continue <i class="fas fa-arrow-right text-xs"></i>
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<!-- FOOTER NOTE -->
+<div class="text-center pb-10 text-xs" style="color:#9ca3af;">
+  <i class="fas fa-lock mr-1" style="color:#c9972a;"></i>
+  All responses are encrypted in transit and at rest &middot; Algosark never sells your data &middot;
+  <a href="#" style="color:#c9972a;" class="hover:underline">Privacy Policy</a>
+</div>
+
+<script>
+  // ── State ───────────────────────────────────────────
+  let currentSection = 1;
+  const TOTAL_SECTIONS = 7;
+  const TOTAL_QUESTIONS = 35;
+  const sectionNames = [
+    'Personal Profile',
+    'Trading Experience',
+    'Financial Profile',
+    'Risk Tolerance',
+    'Strategy Preferences',
+    'Technical Preferences',
+    'Goals & Constraints',
+  ];
+  const sectionQCounts = [5, 5, 5, 5, 5, 5, 5]; // questions per section
+
+  // ── Single-select opt-btn groups ───────────────────
+  document.querySelectorAll('[id^="q"]').forEach(group => {
+    if (group.classList.contains('survey-card') || group.tagName !== 'DIV') return;
+    group.querySelectorAll('.opt-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        group.querySelectorAll('.opt-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        // Clear related error
+        const errId = 'err-' + group.id;
+        const errEl = document.getElementById(errId);
+        if (errEl) { errEl.classList.remove('show'); }
+      });
+    });
+  });
+
+  // ── Multi-select chip groups ────────────────────────
+  document.querySelectorAll('.chip-btn').forEach(chip => {
+    chip.addEventListener('click', () => {
+      chip.classList.toggle('selected');
+    });
+  });
+
+  // ── Slider ─────────────────────────────────────────
+  const slider = document.getElementById('q16');
+  const sliderLabel = document.getElementById('q16-label');
+  function updateSlider(val) {
+    sliderLabel.textContent = val + '%';
+    const pct = (val - 1) / 49;
+    // Update risk bar colours based on value
+    const bars = [document.getElementById('rb1'),document.getElementById('rb2'),document.getElementById('rb3'),document.getElementById('rb4'),document.getElementById('rb5')];
+    bars.forEach((b, i) => {
+      b.style.opacity = pct > (i / 5) ? '1' : '0.2';
+    });
+  }
+  slider.addEventListener('input', () => updateSlider(slider.value));
+  updateSlider(slider.value);
+
+  // ── Progress ────────────────────────────────────────
+  function updateProgress() {
+    const questionsCompleted = sectionQCounts.slice(0, currentSection - 1).reduce((a,b) => a+b, 0);
+    const pct = Math.round((questionsCompleted / TOTAL_QUESTIONS) * 100);
+    document.getElementById('progress-fill').style.width = pct + '%';
+    document.getElementById('pct-label').textContent = pct + '%';
+    document.getElementById('section-name').textContent = `Section ${currentSection} of ${TOTAL_SECTIONS} — ${sectionNames[currentSection - 1] || 'Complete'}`;
+    document.getElementById('q-counter').textContent = `Questions ${questionsCompleted + 1}–${Math.min(questionsCompleted + sectionQCounts[currentSection-1], TOTAL_QUESTIONS)} of ${TOTAL_QUESTIONS}`;
+    document.getElementById('section-counter').textContent = `Section ${currentSection} / ${TOTAL_SECTIONS}`;
+
+    // Dots
+    for (let i = 1; i <= TOTAL_SECTIONS; i++) {
+      const dot = document.getElementById('dot-' + i);
+      dot.classList.remove('done', 'active');
+      if (i < currentSection) dot.classList.add('done');
+      else if (i === currentSection) dot.classList.add('active');
+    }
+  }
+
+  // ── Validation per section ──────────────────────────
+  function validateSection(sec) {
+    let ok = true;
+
+    function reqSingle(id) {
+      const el = document.getElementById(id);
+      const errEl = document.getElementById('err-' + id);
+      if (el && !el.querySelector('.opt-btn.selected')) {
+        if (errEl) errEl.classList.add('show');
+        ok = false;
+      } else if (errEl) errEl.classList.remove('show');
+    }
+    function reqText(id) {
+      const el = document.getElementById(id);
+      const errEl = document.getElementById('err-' + id);
+      if (el && !el.value.trim()) {
+        el.classList.add('field-error');
+        if (errEl) errEl.classList.add('show');
+        ok = false;
+      } else if (el) {
+        el.classList.remove('field-error');
+        if (errEl) errEl.classList.remove('show');
+      }
+    }
+    function reqEmail(id) {
+      const el = document.getElementById(id);
+      const errEl = document.getElementById('err-' + id);
+      const valid = el && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(el.value.trim());
+      if (!valid) {
+        if (el) el.classList.add('field-error');
+        if (errEl) errEl.classList.add('show');
+        ok = false;
+      } else {
+        el.classList.remove('field-error');
+        if (errEl) errEl.classList.remove('show');
+      }
+    }
+    function reqSelect(id) {
+      const el = document.getElementById(id);
+      const errEl = document.getElementById('err-' + id);
+      if (el && !el.value) {
+        el.classList.add('field-error');
+        if (errEl) errEl.classList.add('show');
+        ok = false;
+      } else if (el) {
+        el.classList.remove('field-error');
+        if (errEl) errEl.classList.remove('show');
+      }
+    }
+
+    if (sec === 1) {
+      reqText('q1'); reqEmail('q2'); reqSingle('q3'); reqSelect('q4');
+    }
+    if (sec === 2) {
+      reqSingle('q6');
+    }
+    if (sec === 3) {
+      reqSingle('q11'); reqSingle('q12'); reqSingle('q13');
+    }
+    if (sec === 4) {
+      reqSingle('q17'); reqSingle('q18');
+    }
+    if (sec === 7) {
+      reqSingle('q31'); reqSingle('q32');
+      // Declarations
+      const d1 = document.getElementById('decl1').checked;
+      const d2 = document.getElementById('decl2').checked;
+      const d3 = document.getElementById('decl3').checked;
+      const d4 = document.getElementById('decl4').checked;
+      const errDecl = document.getElementById('err-decl');
+      if (!d1 || !d2 || !d3 || !d4) {
+        errDecl.classList.add('show');
+        ok = false;
+      } else errDecl.classList.remove('show');
+    }
+    return ok;
+  }
+
+  // ── Navigation ──────────────────────────────────────
+  function showSection(n) {
+    document.querySelectorAll('.survey-card').forEach(c => c.classList.remove('active'));
+    const el = document.getElementById('sec-' + n);
+    if (el) el.classList.add('active');
+    document.getElementById('btn-prev').style.display = (n > 1) ? 'inline-flex' : 'none';
+    document.getElementById('btn-next').innerHTML = (n === TOTAL_SECTIONS)
+      ? '<i class="fas fa-paper-plane text-sm"></i> Submit Survey'
+      : 'Continue <i class="fas fa-arrow-right text-xs"></i>';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    updateProgress();
+  }
+
+  document.getElementById('btn-next').addEventListener('click', () => {
+    if (!validateSection(currentSection)) return;
+    if (currentSection === TOTAL_SECTIONS) {
+      // Submit
+      document.querySelectorAll('.survey-card').forEach(c => c.classList.remove('active'));
+      document.getElementById('success-screen').classList.add('show');
+      document.getElementById('nav-btns').style.display = 'none';
+      // Set progress to 100%
+      document.getElementById('progress-fill').style.width = '100%';
+      document.getElementById('pct-label').textContent = '100%';
+      document.getElementById('section-name').textContent = 'Survey Complete ✓';
+      document.getElementById('q-counter').textContent = '35 of 35 questions answered';
+      for (let i = 1; i <= TOTAL_SECTIONS; i++) {
+        const dot = document.getElementById('dot-' + i);
+        dot.classList.remove('active');
+        dot.classList.add('done');
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      currentSection++;
+      showSection(currentSection);
+    }
+  });
+
+  document.getElementById('btn-prev').addEventListener('click', () => {
+    if (currentSection > 1) {
+      currentSection--;
+      showSection(currentSection);
+    }
+  });
+
+  // Init
+  showSection(1);
+</script>
+</body>
+</html>
