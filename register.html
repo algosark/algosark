@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Create Account — Algosark</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy:    #0d1b3e;
+      --navy700: #162a5c;
+      --navy500: #1e3a7a;
+      --gold:    #c9972a;
+      --gold-lt: #f0c96a;
+      --gold-pale: #fdf6e3;
+      --slate-soft: #f4f6fb;
+      --slate-mid:  #e8edf7;
+      --slate-dark: #6b7a99;
+      --ink: #0d1117;
+      --white: #ffffff;
+    }
+
+    html, body { height: 100%; }
+
+    body {
+      font-family: 'DM Sans', system-ui, sans-serif;
+      color: var(--ink);
+      background: var(--white);
+      -webkit-font-smoothing: antialiased;
+      display: flex;
+      min-height: 100vh;
+    }
+
+    .display-font { font-family: 'DM Serif Display', Georgia, serif; }
+
+    /* ── LAYOUT ── */
+    .auth-layout {
+      display: flex;
+      width: 100%;
+      min-height: 100vh;
+    }
+
+    /* ── LEFT PANEL ── */
+    .auth-left {
+      width: 42%;
+      background: linear-gradient(150deg, var(--navy) 0%, var(--navy700) 55%, var(--navy500) 100%);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 2.5rem 3rem;
+    }
+
+    .auth-left::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(201,151,42,.07) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(201,151,42,.07) 1px, transparent 1px);
+      background-size: 48px 48px;
+    }
+
+    .auth-left::after {
+      content: '';
+      position: absolute;
+      width: 500px; height: 500px;
+      background: radial-gradient(ellipse, rgba(201,151,42,.13) 0%, transparent 70%);
+      bottom: -80px; right: -120px;
+      pointer-events: none;
+    }
+
+    .blob-top {
+      position: absolute;
+      width: 260px; height: 260px;
+      background: radial-gradient(ellipse, rgba(30,58,122,.5) 0%, transparent 70%);
+      top: -60px; left: -40px;
+      pointer-events: none;
+    }
+
+    .panel-logo {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      text-decoration: none;
+    }
+    .panel-logo-icon {
+      width: 38px; height: 38px;
+      background: linear-gradient(135deg, var(--gold), var(--gold-lt));
+      border-radius: 9px;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'DM Serif Display', serif;
+      font-size: 1rem;
+      color: var(--navy);
+      font-weight: 700;
+    }
+    .panel-logo-text {
+      font-family: 'DM Serif Display', Georgia, serif;
+      font-size: 1.4rem;
+      color: var(--white);
+      letter-spacing: -.02em;
+    }
+    .panel-logo-text span { color: var(--gold); }
+
+    .panel-hero {
+      position: relative; z-index: 2;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 2rem 0;
+    }
+
+    .panel-tagline {
+      font-family: 'DM Serif Display', Georgia, serif;
+      font-size: clamp(1.8rem, 2.8vw, 2.4rem);
+      color: var(--white);
+      line-height: 1.18;
+      margin-bottom: 1.25rem;
+    }
+    .panel-tagline em {
+      font-style: italic;
+      background: linear-gradient(90deg, var(--gold), var(--gold-lt), var(--gold));
+      background-size: 200% auto;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: shimmer 3s linear infinite;
+    }
+
+    .panel-sub {
+      color: var(--slate-dark);
+      font-size: .9rem;
+      line-height: 1.7;
+      max-width: 320px;
+      margin-bottom: 2.5rem;
+    }
+
+    /* Process steps */
+    .process-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+    .process-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      position: relative;
+    }
+    .process-step:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      left: 17px;
+      top: 36px;
+      width: 2px;
+      height: calc(100% - 8px);
+      background: linear-gradient(to bottom, rgba(201,151,42,.4), rgba(201,151,42,.08));
+    }
+    .step-num {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      border: 2px solid rgba(201,151,42,.4);
+      background: rgba(201,151,42,.08);
+      display: flex; align-items: center; justify-content: center;
+      font-size: .8rem;
+      font-weight: 700;
+      color: var(--gold);
+      flex-shrink: 0;
+      position: relative;
+      z-index: 1;
+    }
+    .step-content {
+      padding-bottom: 1.5rem;
+    }
+    .step-title {
+      font-size: .85rem;
+      font-weight: 600;
+      color: var(--white);
+      margin-bottom: .2rem;
+    }
+    .step-desc {
+      font-size: .78rem;
+      color: var(--slate-dark);
+      line-height: 1.5;
+    }
+
+    .panel-footer {
+      position: relative; z-index: 2;
+      font-size: .72rem;
+      color: rgba(107,122,153,.55);
+      line-height: 1.6;
+    }
+
+    /* ── RIGHT PANEL ── */
+    .auth-right {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      align-items: center;
+      padding: 3rem 2rem;
+      background: var(--white);
+      position: relative;
+      overflow-y: auto;
+    }
+
+    .auth-right::before {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0;
+      width: 280px; height: 280px;
+      background: radial-gradient(ellipse, rgba(201,151,42,.04) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .auth-box {
+      width: 100%;
+      max-width: 440px;
+      position: relative;
+      z-index: 1;
+      animation: fadeUp .6s ease both;
+    }
+
+    .auth-header { margin-bottom: 1.75rem; }
+    .auth-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: .7rem;
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--gold);
+      background: rgba(201,151,42,.1);
+      border: 1px solid rgba(201,151,42,.25);
+      padding: .25rem .75rem;
+      border-radius: 99px;
+      margin-bottom: 1rem;
+    }
+    .auth-title {
+      font-family: 'DM Serif Display', Georgia, serif;
+      font-size: 2rem;
+      color: var(--navy);
+      line-height: 1.18;
+      margin-bottom: .4rem;
+    }
+    .auth-subtitle {
+      font-size: .88rem;
+      color: var(--slate-dark);
+      line-height: 1.6;
+    }
+    .auth-subtitle a {
+      color: var(--gold);
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .auth-subtitle a:hover { text-decoration: underline; }
+
+    /* Social */
+    .social-row {
+      display: flex;
+      gap: .65rem;
+      margin-bottom: 1.3rem;
+    }
+    .social-sign-btn {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: .45rem;
+      border: 1.5px solid var(--slate-mid);
+      background: var(--white);
+      border-radius: 10px;
+      padding: .7rem 1rem;
+      font-size: .82rem;
+      font-weight: 500;
+      color: var(--ink);
+      cursor: pointer;
+      transition: border-color .2s, background .2s, box-shadow .2s;
+      text-decoration: none;
+    }
+    .social-sign-btn:hover {
+      border-color: var(--gold);
+      background: var(--gold-pale);
+      box-shadow: 0 2px 10px rgba(201,151,42,.1);
+    }
+    .social-sign-btn svg { width: 17px; height: 17px; }
+
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: .65rem;
+      margin-bottom: 1.3rem;
+      color: var(--slate-dark);
+      font-size: .78rem;
+    }
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--slate-mid);
+    }
+
+    /* Two-col row for name fields */
+    .form-row-two {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .75rem;
+    }
+
+    .form-group { margin-bottom: 1rem; }
+    .form-label {
+      display: block;
+      font-size: .78rem;
+      font-weight: 600;
+      color: var(--navy);
+      margin-bottom: .4rem;
+      letter-spacing: .01em;
+    }
+    .input-wrap { position: relative; }
+    .input-icon {
+      position: absolute;
+      left: 13px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--slate-dark);
+      font-size: .82rem;
+      pointer-events: none;
+      transition: color .2s;
+    }
+    .form-input {
+      width: 100%;
+      border: 1.5px solid var(--slate-mid);
+      border-radius: 10px;
+      padding: .72rem 1rem .72rem 2.5rem;
+      font-family: 'DM Sans', sans-serif;
+      font-size: .88rem;
+      color: var(--ink);
+      background: var(--white);
+      outline: none;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .form-input::placeholder { color: #b0bac9; }
+    .form-input:focus {
+      border-color: var(--gold);
+      box-shadow: 0 0 0 3px rgba(201,151,42,.12);
+    }
+    .form-input:focus ~ .input-icon { color: var(--gold); }
+    .input-wrap:focus-within .input-icon { color: var(--gold); }
+
+    /* Select styling */
+    select.form-input {
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%236b7a99'%3E%3Cpath fill-rule='evenodd' d='M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z' clip-rule='evenodd'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      background-size: 18px;
+      padding-right: 2.2rem;
+    }
+
+    /* Password strength */
+    .pw-toggle {
+      position: absolute;
+      right: 13px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--slate-dark);
+      font-size: .82rem;
+      padding: 0;
+      transition: color .2s;
+    }
+    .pw-toggle:hover { color: var(--navy); }
+
+    .strength-bar {
+      margin-top: .4rem;
+      display: flex;
+      gap: 3px;
+    }
+    .strength-seg {
+      height: 3px;
+      flex: 1;
+      border-radius: 99px;
+      background: var(--slate-mid);
+      transition: background .3s;
+    }
+    .strength-label {
+      font-size: .7rem;
+      margin-top: .25rem;
+      color: var(--slate-dark);
+      transition: color .3s;
+    }
+
+    /* Checkboxes */
+    .checkbox-group { margin-bottom: 1rem; }
+    .checkbox-label {
+      display: flex;
+      align-items: flex-start;
+      gap: .6rem;
+      font-size: .8rem;
+      color: var(--slate-dark);
+      cursor: pointer;
+      line-height: 1.5;
+      margin-bottom: .6rem;
+    }
+    .checkbox-label input[type="checkbox"] {
+      width: 15px; height: 15px;
+      margin-top: .15rem;
+      accent-color: var(--gold);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .checkbox-label a { color: var(--gold); font-weight: 600; text-decoration: none; }
+    .checkbox-label a:hover { text-decoration: underline; }
+
+    /* Progress indicator */
+    .progress-wrap {
+      margin-bottom: 1.5rem;
+    }
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: .5rem;
+    }
+    .progress-label {
+      font-size: .72rem;
+      font-weight: 600;
+      color: var(--slate-dark);
+      text-transform: uppercase;
+      letter-spacing: .07em;
+    }
+    .progress-steps-text {
+      font-size: .72rem;
+      color: var(--slate-dark);
+    }
+    .progress-track {
+      height: 4px;
+      background: var(--slate-mid);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--gold), var(--gold-lt));
+      border-radius: 99px;
+      transition: width .4s ease;
+    }
+
+    /* Submit */
+    .btn-submit {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: .5rem;
+      background: var(--gold);
+      color: var(--white);
+      font-family: 'DM Sans', sans-serif;
+      font-size: .95rem;
+      font-weight: 600;
+      padding: .85rem 1.5rem;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      box-shadow: 0 4px 18px rgba(201,151,42,.35);
+      transition: background .25s, transform .2s, box-shadow .25s;
+      position: relative;
+      overflow: hidden;
+      margin-top: .25rem;
+    }
+    .btn-submit::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,.15) 50%, transparent 100%);
+      transform: translateX(-100%);
+      transition: transform .4s ease;
+    }
+    .btn-submit:hover {
+      background: #b8851f;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(201,151,42,.4);
+    }
+    .btn-submit:hover::after { transform: translateX(100%); }
+    .btn-submit .spinner {
+      display: none;
+      width: 17px; height: 17px;
+      border: 2px solid rgba(255,255,255,.4);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+    }
+    .btn-submit.loading .spinner { display: block; }
+    .btn-submit.loading .btn-text { display: none; }
+
+    .auth-alt {
+      text-align: center;
+      margin-top: 1.25rem;
+      font-size: .83rem;
+      color: var(--slate-dark);
+    }
+    .auth-alt a {
+      color: var(--navy);
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .auth-alt a:hover { color: var(--gold); }
+
+    /* Micro social proof */
+    .social-proof {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      background: var(--slate-soft);
+      border: 1px solid var(--slate-mid);
+      border-radius: 12px;
+      padding: .85rem 1rem;
+      margin-top: 1.5rem;
+    }
+    .avatars {
+      display: flex;
+    }
+    .avatar {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      border: 2px solid var(--white);
+      background: linear-gradient(135deg, var(--navy700), var(--navy500));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: .6rem;
+      font-weight: 700;
+      color: white;
+      margin-left: -6px;
+    }
+    .avatar:first-child { margin-left: 0; }
+    .proof-text {
+      font-size: .75rem;
+      color: var(--slate-dark);
+      line-height: 1.4;
+    }
+    .proof-text strong { color: var(--navy); }
+
+    /* Error */
+    .input-error .form-input {
+      border-color: #ef4444;
+      box-shadow: 0 0 0 3px rgba(239,68,68,.1);
+    }
+    .error-msg {
+      display: none;
+      font-size: .72rem;
+      color: #ef4444;
+      margin-top: .3rem;
+    }
+    .input-error .error-msg { display: block; }
+
+    /* Success */
+    .success-overlay {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 3rem 1rem;
+    }
+    .success-overlay.show { display: flex; }
+    .success-icon {
+      width: 72px; height: 72px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2rem;
+      color: #059669;
+      margin-bottom: 1.5rem;
+      animation: popIn .5s cubic-bezier(.34,1.56,.64,1) both;
+    }
+    @keyframes popIn {
+      from { transform: scale(0); opacity: 0; }
+      to   { transform: scale(1); opacity: 1; }
+    }
+
+    /* Mobile */
+    .mobile-auth-header {
+      display: none;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid var(--slate-mid);
+      background: var(--white);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+    .mobile-logo-text {
+      font-family: 'DM Serif Display', serif;
+      font-size: 1.3rem;
+      color: var(--navy);
+      text-decoration: none;
+    }
+    .mobile-logo-text span { color: var(--gold); }
+
+    /* Animations */
+    @keyframes shimmer {
+      0%   { background-position: -200% center; }
+      100% { background-position: 200% center; }
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: .4; }
+    }
+
+    @media (max-width: 900px) {
+      .auth-left { display: none; }
+      .auth-right { padding: 0; justify-content: flex-start; }
+      .mobile-auth-header { display: flex; }
+      .auth-box { padding: 2rem 1.5rem; max-width: 100%; }
+      .form-row-two { grid-template-columns: 1fr; gap: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<div style="display:flex; flex-direction:column; flex:1;">
+  <!-- Mobile header -->
+  <div class="mobile-auth-header">
+    <a href="index.html" class="mobile-logo-text">Algos<span>ark</span></a>
+    <a href="login.html" style="font-size:.82rem; font-weight:600; color:var(--gold); text-decoration:none;">Sign in →</a>
+  </div>
+
+  <div class="auth-layout">
+
+    <!-- LEFT panel -->
+    <div class="auth-left">
+      <div class="blob-top"></div>
+
+      <a href="index.html" class="panel-logo">
+        <div class="panel-logo-icon">A</div>
+        <span class="panel-logo-text">Algos<span>ark</span></span>
+      </a>
+
+      <div class="panel-hero">
+        <p class="panel-tagline">
+          Your strategy.<br/>
+          <em>Delivered in<br/>24–48 hours.</em>
+        </p>
+        <p class="panel-sub">
+          Join UK retail investors getting a personalised ML trading strategy — without writing a single line of code.
+        </p>
+
+        <div class="process-steps">
+          <div class="process-step">
+            <div class="step-num">1</div>
+            <div class="step-content">
+              <div class="step-title">Create your free account</div>
+              <div class="step-desc">Takes under 2 minutes. No credit card needed.</div>
+            </div>
+          </div>
+          <div class="process-step">
+            <div class="step-num">2</div>
+            <div class="step-content">
+              <div class="step-title">Complete the risk survey</div>
+              <div class="step-desc">20 minutes to capture your goals, capital, and risk tolerance.</div>
+            </div>
+          </div>
+          <div class="process-step">
+            <div class="step-num">3</div>
+            <div class="step-content">
+              <div class="step-title">Receive your ML strategy</div>
+              <div class="step-desc">Backtested, personalised, and ready to paper-trade within 48 hrs.</div>
+            </div>
+          </div>
+          <div class="process-step">
+            <div class="step-num">4</div>
+            <div class="step-content">
+              <div class="step-title">Go live when ready</div>
+              <div class="step-desc">Connect your brokerage and start trading — you stay in control.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p class="panel-footer">
+        Trading in financial products involves significant risk.<br/>
+        Past performance is not indicative of future results.<br/>
+        © 2026 Algosark. FCA-aware design.
+      </p>
+    </div>
+
+    <!-- RIGHT form panel -->
+    <div class="auth-right">
+      <div class="auth-box">
+
+        <!-- Success overlay (shown after submit) -->
+        <div class="success-overlay" id="successOverlay">
+          <div class="success-icon"><i class="fas fa-check"></i></div>
+          <h2 class="display-font" style="font-size:1.8rem;color:var(--navy);margin-bottom:.6rem;">Account created!</h2>
+          <p style="color:var(--slate-dark);font-size:.9rem;line-height:1.6;max-width:300px;margin-bottom:1.5rem;">
+            Welcome to Algosark. We'll take you to the risk survey now so we can build your strategy.
+          </p>
+          <div style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;color:var(--slate-dark);">
+            <div style="width:14px;height:14px;border:2px solid var(--slate-mid);border-top-color:var(--gold);border-radius:50%;animation:spin .6s linear infinite;"></div>
+            Redirecting to your survey…
+          </div>
+        </div>
+
+        <!-- Form (hidden after submit) -->
+        <div id="formWrap">
+          <div class="auth-header">
+            <div class="auth-eyebrow">
+              <span style="width:6px;height:6px;border-radius:50%;background:var(--gold);display:inline-block;animation:pulse 2s infinite;"></span>
+              Free — no card required
+            </div>
+            <h1 class="auth-title display-font">Create your<br/>free account.</h1>
+            <p class="auth-subtitle">
+              Already have one? <a href="login.html">Sign in here →</a>
+            </p>
+          </div>
+
+          <!-- Progress bar -->
+          <div class="progress-wrap">
+            <div class="progress-header">
+              <span class="progress-label">Registration progress</span>
+              <span class="progress-steps-text" id="progressText">Step 1 of 3</span>
+            </div>
+            <div class="progress-track">
+              <div class="progress-fill" id="progressFill" style="width:33%"></div>
+            </div>
+          </div>
+
+          <!-- Social sign-up -->
+          <div class="social-row">
+            <a href="#" class="social-sign-btn">
+              <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+              </svg>
+              Continue with Google
+            </a>
+          </div>
+
+          <div class="divider">or register with email</div>
+
+          <form id="registerForm" novalidate>
+
+            <!-- Section 1: Personal -->
+            <div class="form-row-two">
+              <div class="form-group" id="firstNameGroup">
+                <label class="form-label" for="firstName">First name</label>
+                <div class="input-wrap">
+                  <input class="form-input" type="text" id="firstName" placeholder="Alex" autocomplete="given-name" />
+                  <i class="fas fa-user input-icon"></i>
+                </div>
+                <div class="error-msg">Required.</div>
+              </div>
+              <div class="form-group" id="lastNameGroup">
+                <label class="form-label" for="lastName">Last name</label>
+                <div class="input-wrap">
+                  <input class="form-input" type="text" id="lastName" placeholder="Morgan" autocomplete="family-name" />
+                  <i class="fas fa-user input-icon"></i>
+                </div>
+                <div class="error-msg">Required.</div>
+              </div>
+            </div>
+
+            <div class="form-group" id="emailGroup">
+              <label class="form-label" for="email">Email address</label>
+              <div class="input-wrap">
+                <input class="form-input" type="email" id="email" placeholder="you@example.com" autocomplete="email" />
+                <i class="fas fa-envelope input-icon"></i>
+              </div>
+              <div class="error-msg">Please enter a valid email address.</div>
+            </div>
+
+            <div class="form-group" id="pwGroup">
+              <label class="form-label" for="password">Password</label>
+              <div class="input-wrap">
+                <input class="form-input" type="password" id="password" placeholder="Min. 8 characters" autocomplete="new-password" />
+                <i class="fas fa-lock input-icon"></i>
+                <button type="button" class="pw-toggle" id="pwToggle" tabindex="-1">
+                  <i class="fas fa-eye" id="pwIcon"></i>
+                </button>
+              </div>
+              <div class="strength-bar">
+                <div class="strength-seg" id="s1"></div>
+                <div class="strength-seg" id="s2"></div>
+                <div class="strength-seg" id="s3"></div>
+                <div class="strength-seg" id="s4"></div>
+              </div>
+              <div class="strength-label" id="strengthLabel">Enter a password</div>
+              <div class="error-msg">Password must be at least 8 characters.</div>
+            </div>
+
+            <div class="form-group" id="experienceGroup">
+              <label class="form-label" for="experience">Trading experience</label>
+              <div class="input-wrap">
+                <select class="form-input" id="experience" style="padding-left:2.5rem;">
+                  <option value="" disabled selected>Select your experience level</option>
+                  <option value="beginner">Beginner — less than 1 year</option>
+                  <option value="intermediate">Intermediate — 1–3 years</option>
+                  <option value="experienced">Experienced — 3–5 years</option>
+                  <option value="expert">Expert — 5+ years</option>
+                </select>
+                <i class="fas fa-chart-line input-icon"></i>
+              </div>
+              <div class="error-msg">Please select your experience level.</div>
+            </div>
+
+            <!-- Checkboxes -->
+            <div class="checkbox-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="terms" />
+                I agree to the <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" id="risk" />
+                I understand that trading in financial products involves significant risk and I may lose capital
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" id="marketing" checked />
+                Send me performance updates, market insights, and product news (optional)
+              </label>
+            </div>
+            <div class="error-msg" id="termsError" style="display:none;margin-bottom:.75rem;">You must agree to the terms and risk warning.</div>
+
+            <button type="submit" class="btn-submit" id="registerBtn">
+              <span class="btn-text"><i class="fas fa-rocket" style="font-size:.85rem;"></i>&nbsp; Create Free Account</span>
+              <div class="spinner"></div>
+            </button>
+          </form>
+
+          <div class="auth-alt">
+            Already have an account? <a href="login.html">Sign in</a>
+          </div>
+
+          <!-- Social proof -->
+          <div class="social-proof">
+            <div class="avatars">
+              <div class="avatar">JK</div>
+              <div class="avatar" style="background:linear-gradient(135deg,#b8851f,var(--gold));">SM</div>
+              <div class="avatar" style="background:linear-gradient(135deg,var(--navy500),var(--navy700));">RP</div>
+              <div class="avatar" style="background:linear-gradient(135deg,#2d6a4f,#52b788);">TW</div>
+            </div>
+            <div class="proof-text">
+              <strong>78% of surveyed UK investors</strong> said they were interested or very interested in a platform like Algosark.
+            </div>
+          </div>
+        </div><!-- /#formWrap -->
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  // Password toggle
+  const pwToggle = document.getElementById('pwToggle');
+  const pwInput  = document.getElementById('password');
+  const pwIcon   = document.getElementById('pwIcon');
+  pwToggle.addEventListener('click', () => {
+    const show = pwInput.type === 'password';
+    pwInput.type = show ? 'text' : 'password';
+    pwIcon.className = show ? 'fas fa-eye-slash' : 'fas fa-eye';
+  });
+
+  // Password strength
+  const segs = ['s1','s2','s3','s4'].map(id => document.getElementById(id));
+  const strengthLabel = document.getElementById('strengthLabel');
+  const colors = ['#ef4444','#f97316','#eab308','#22c55e'];
+  const labels = ['Too weak','Fair','Good','Strong'];
+
+  function getStrength(pw) {
+    let score = 0;
+    if (pw.length >= 8)  score++;
+    if (/[A-Z]/.test(pw)) score++;
+    if (/[0-9]/.test(pw)) score++;
+    if (/[^A-Za-z0-9]/.test(pw)) score++;
+    return score;
+  }
+
+  pwInput.addEventListener('input', () => {
+    const pw = pwInput.value;
+    const str = pw ? getStrength(pw) : 0;
+    segs.forEach((s, i) => {
+      s.style.background = i < str ? colors[str - 1] : 'var(--slate-mid)';
+    });
+    strengthLabel.textContent = pw ? labels[str - 1] || 'Too weak' : 'Enter a password';
+    strengthLabel.style.color = pw ? colors[str - 1] : 'var(--slate-dark)';
+    updateProgress();
+  });
+
+  // Progress tracking
+  const progressFill = document.getElementById('progressFill');
+  const progressText = document.getElementById('progressText');
+  const fields = ['firstName','lastName','email','password','experience'];
+
+  function updateProgress() {
+    let filled = 0;
+    if (document.getElementById('firstName').value.trim()) filled++;
+    if (document.getElementById('lastName').value.trim()) filled++;
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(document.getElementById('email').value)) filled++;
+    if (document.getElementById('password').value.length >= 8) filled++;
+    if (document.getElementById('experience').value) filled++;
+
+    const pct = Math.round((filled / fields.length) * 100);
+    progressFill.style.width = Math.max(5, pct) + '%';
+
+    if (filled <= 2) { progressText.textContent = 'Step 1 of 3 — Personal details'; }
+    else if (filled <= 4) { progressText.textContent = 'Step 2 of 3 — Security & profile'; }
+    else { progressText.textContent = 'Step 3 of 3 — Almost done!'; }
+  }
+
+  fields.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', updateProgress);
+    if (el && el.tagName === 'SELECT') el.addEventListener('change', updateProgress);
+  });
+
+  // Clear errors on input
+  ['firstName','lastName','email','password'].forEach(id => {
+    document.getElementById(id).addEventListener('input', () => {
+      document.getElementById(id === 'firstName' ? 'firstNameGroup' :
+        id === 'lastName' ? 'lastNameGroup' :
+        id === 'email' ? 'emailGroup' : 'pwGroup').classList.remove('input-error');
+    });
+  });
+  document.getElementById('experience').addEventListener('change', () => {
+    document.getElementById('experienceGroup').classList.remove('input-error');
+  });
+
+  // Validation
+  function validate() {
+    let ok = true;
+    const setErr = (groupId, cond) => {
+      const g = document.getElementById(groupId);
+      if (!cond) { g.classList.add('input-error'); ok = false; }
+      else { g.classList.remove('input-error'); }
+    };
+
+    setErr('firstNameGroup', document.getElementById('firstName').value.trim());
+    setErr('lastNameGroup', document.getElementById('lastName').value.trim());
+    setErr('emailGroup', /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(document.getElementById('email').value));
+    setErr('pwGroup', document.getElementById('password').value.length >= 8);
+    setErr('experienceGroup', document.getElementById('experience').value);
+
+    const termsOk = document.getElementById('terms').checked && document.getElementById('risk').checked;
+    const termsErr = document.getElementById('termsError');
+    if (!termsOk) { termsErr.style.display = 'block'; ok = false; }
+    else { termsErr.style.display = 'none'; }
+
+    return ok;
+  }
+
+  // Submit
+  const form = document.getElementById('registerForm');
+  const btn  = document.getElementById('registerBtn');
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    if (!validate()) return;
+
+    btn.classList.add('loading');
+    btn.disabled = true;
+
+    fetch('/api/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        firstName: document.getElementById('firstName').value.trim(),
+        lastName: document.getElementById('lastName').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        password: document.getElementById('password').value,
+        experience: document.getElementById('experience').value,
+        marketingOptIn: document.getElementById('marketing').checked
+      })
+    }).then(res => {
+      if (!res.ok) throw new Error('Registration failed');
+      return res.json();
+    }).then(data => {
+      btn.classList.remove('loading');
+      btn.disabled = false;
+      document.getElementById('formWrap').style.display = 'none';
+      document.getElementById('successOverlay').classList.add('show');
+      setTimeout(() => {
+        window.location.href = 'survey.html?referral_page=register';
+      }, 2500);
+    }).catch(err => {
+      btn.classList.remove('loading');
+      btn.disabled = false;
+      console.error(err);
+    });
+  });
+
+  // terms checkbox clears error
+  ['terms','risk'].forEach(id => {
+    document.getElementById(id).addEventListener('change', () => {
+      if (document.getElementById('terms').checked && document.getElementById('risk').checked) {
+        document.getElementById('termsError').style.display = 'none';
+      }
+    });
+  });
+</script>
+</body>
+</html>

@@ -10,6 +10,15 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
+    window.onload = () => { 
+      // only load this page if referral_page=register
+      // const urlParams = new URLSearchParams(window.location.search);
+      // if (urlParams.get('referral_page') !== 'register') {
+        // window.location.href = 'index.html';
+      //}
+    };
+
+
     tailwind.config = {
       theme: {
         extend: {
@@ -1135,6 +1144,122 @@
 
   // Init
   showSection(1);
+  
+  // Collect and submit survey data
+  async function submitSurvey() {
+      // Show loading state
+      const submitBtn = document.getElementById('btn-next');
+      const originalText = submitBtn.innerHTML;
+      submitBtn.innerHTML = 'Submitting...';
+      submitBtn.disabled = true;
+
+      try {
+          const data = {
+              // SECTION 1
+              full_name: document.getElementById('q1').value.trim(),
+              email: document.getElementById('q2').value.trim(),
+              age_range: getSelectedValue('q3'),
+              country: document.getElementById('q4').value,
+              employment_status: getSelectedValue('q5'),
+
+              // SECTION 2
+              trading_experience: getSelectedValue('q6'),
+              asset_classes: getSelectedValues('q7'),
+              algo_familiarity: getSelectedValue('q8'),
+              coding_background: getSelectedValue('q9'),
+              trading_frequency: getSelectedValue('q10'),
+
+              // SECTION 3
+              annual_income: getSelectedValue('q11'),
+              net_worth: getSelectedValue('q12'),
+              initial_capital: getSelectedValue('q13'),
+              debts: getSelectedValue('q14'),
+              emergency_fund: getSelectedValue('q15'),
+
+              // SECTION 4
+              max_monthly_loss: parseFloat(document.getElementById('q16').value),
+              reaction_to_20pct_loss: getSelectedValue('q17'),
+              return_profile: getSelectedValue('q18'),
+              investment_horizon: getSelectedValue('q19'),
+              past_loss_experience: getSelectedValue('q20'),
+
+              // SECTION 5
+              target_markets: getSelectedValues('q21'),
+              preferred_style: getSelectedValue('q22'),
+              excluded_sectors: document.getElementById('q23').value.trim(),
+              leverage_preference: getSelectedValue('q24'),
+              long_short_preference: getSelectedValue('q25'),
+
+              // SECTION 6
+              brokerages: getSelectedValues('q26'),
+              account_type: getSelectedValue('q27'),
+              api_comfort_level: getSelectedValue('q28'),
+              trading_sessions: getSelectedValues('q29'),
+              overnight_weekend: getSelectedValue('q30'),
+
+              // SECTION 7
+              primary_motivation: getSelectedValue('q31'),
+              target_annual_return: getSelectedValue('q32'),
+              max_simultaneous_positions: getSelectedValue('q33'),
+              additional_constraints: document.getElementById('q34').value.trim(),
+
+              // Declarations
+              decl_risk_capital: document.getElementById('decl1').checked,
+              decl_past_performance: document.getElementById('decl2').checked,
+              decl_consent: document.getElementById('decl3').checked,
+              decl_over_18: document.getElementById('decl4').checked,
+          };
+
+          const response = await fetch('http://127.0.0.1:8000/survey/submit', {
+              method: 'POST',
+              headers: { 
+                  'Content-Type': 'application/json',
+                  'Accept': 'application/json'
+              },
+              body: JSON.stringify(data)
+          });
+
+          const result = await response.json();
+
+          if (response.ok) {
+              // Show success screen
+              document.querySelectorAll('.survey-card').forEach(c => c.classList.remove('active'));
+              document.getElementById('success-screen').classList.add('show');
+              document.getElementById('nav-btns').style.display = 'none';
+          } else {
+              alert('Submission failed: ' + (result.detail || 'Please try again'));
+          }
+      } catch (error) {
+          console.error('Error:', error);
+          alert('Failed to submit survey. Please check your connection.');
+      } finally {
+          submitBtn.innerHTML = originalText;
+          submitBtn.disabled = false;
+      }
+  }
+
+  // Helper functions
+  function getSelectedValue(groupId) {
+      const selected = document.getElementById(groupId)?.querySelector('.opt-btn.selected');
+      return selected ? selected.dataset.val : null;
+  }
+
+  function getSelectedValues(groupId) {
+      const chips = document.getElementById(groupId)?.querySelectorAll('.chip-btn.selected');
+      return chips ? Array.from(chips).map(chip => chip.dataset.val) : [];
+  }
+
+  // Replace the current submit button listener
+  document.getElementById('btn-next').addEventListener('click', () => {
+      if (!validateSection(currentSection)) return;
+      
+      if (currentSection === TOTAL_SECTIONS) {
+          submitSurvey();           // ← Call our new function
+      } else {
+          currentSection++;
+          showSection(currentSection);
+      }
+  });
 </script>
 </body>
 </html>
