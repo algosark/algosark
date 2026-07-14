@@ -982,15 +982,15 @@
     btn.classList.add('loading');
     btn.disabled = true;
 
-    fetch('/api/register', {
+    fetch('http://127.0.0.1:8000/api/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        firstName: document.getElementById('firstName').value.trim(),
-        lastName: document.getElementById('lastName').value.trim(),
+        first_name: document.getElementById('firstName').value.trim(),
+        last_name: document.getElementById('lastName').value.trim(),
         email: document.getElementById('email').value.trim(),
         password: document.getElementById('password').value,
-        experience: document.getElementById('experience').value,
+        trading_experience: document.getElementById('experience').value,
         marketingOptIn: document.getElementById('marketing').checked
       })
     }).then(res => {

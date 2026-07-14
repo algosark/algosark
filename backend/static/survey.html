@@ -10,15 +10,6 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
-    window.onload = () => { 
-      // only load this page if referral_page=register
-      // const urlParams = new URLSearchParams(window.location.search);
-      // if (urlParams.get('referral_page') !== 'register') {
-        // window.location.href = 'index.html';
-      //}
-    };
-
-
     tailwind.config = {
       theme: {
         extend: {
@@ -199,6 +190,7 @@
       box-shadow: 0 0 0 3px rgba(201,151,42,.12);
     }
     .field-input::placeholder { color: #9ca3af; }
+    .field-input:read-only { background: #f4f6fb; color: #6b7a99; cursor: not-allowed; }
 
     select.field-input { cursor: pointer; }
 
@@ -290,27 +282,61 @@
     .field-error { border-color: #ef4444 !important; }
     .err-msg { color: #ef4444; font-size: .78rem; margin-top: .3rem; display: none; }
     .err-msg.show { display: block; }
+
+    /* ── Auth-gate overlay (shown briefly while we check the session) ── */
+    #auth-gate {
+      position: fixed; inset: 0; z-index: 999;
+      background: #f4f6fb;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 1rem;
+    }
+    #auth-gate.hide { display: none; }
+    .spinner {
+      width: 34px; height: 34px; border-radius: 50%;
+      border: 3px solid #e8edf7; border-top-color: #c9972a;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Toast (submission errors) ── */
+    #toast-wrap { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 1000; display:flex; flex-direction:column; gap:.5rem; }
+    .toast {
+      background: #0d1b3e; color:#fff; border-radius: 10px; padding:.75rem 1.1rem;
+      font-size:.82rem; min-width:260px; box-shadow:0 8px 32px rgba(0,0,0,.25);
+      display:flex; align-items:center; gap:10px; animation: fadeUp .3s ease both;
+    }
+    .toast.error { border-left: 4px solid #ef4444; }
   </style>
 </head>
 <body>
 
+<!-- AUTH GATE — hidden once we've confirmed a session exists -->
+<div id="auth-gate">
+  <div class="spinner"></div>
+  <div class="text-sm" style="color:#6b7a99;">Checking your session…</div>
+</div>
+
 <!-- NAV -->
 <header class="bg-white/95 backdrop-blur border-b border-slate-mid sticky top-0 z-50" style="border-color:#e8edf7;">
   <div class="max-w-5xl mx-auto px-5 lg:px-8 flex items-center justify-between h-16">
-    <a href="index.html" class="flex items-center gap-2.5 no-underline">
+    <a href="dashboard.html" class="flex items-center gap-2.5 no-underline">
       <div class="w-9 h-9 rounded-lg bg-navy flex items-center justify-center" style="background:#0d1b3e;">
         <i class="fas fa-chart-line text-gold text-sm" style="color:#c9972a;"></i>
       </div>
       <span class="display-font text-xl text-navy font-normal tracking-tight" style="color:#0d1b3e;">Algos<span style="color:#c9972a;">ark</span></span>
     </a>
     <nav class="hidden md:flex items-center gap-6">
-      <a href="index.html" class="nav-link text-sm">Home</a>
-      <a href="pricing.html" class="nav-link text-sm">Pricing</a>
-      <a href="strategy.html" class="nav-link text-sm">Strategy</a>
+      <a href="dashboard.html" class="nav-link text-sm">Dashboard</a>
+      <a href="dashboard.html" class="nav-link text-sm">Paper Trading</a>
+      <a href="dashboard.html" class="nav-link text-sm">Settings</a>
     </nav>
-    <div class="flex items-center gap-3 text-sm text-slate-dark" style="color:#6b7a99;">
-      <i class="fas fa-lock text-gold text-xs" style="color:#c9972a;"></i>
-      <span class="hidden sm:inline">Encrypted &amp; Secure</span>
+    <div class="flex items-center gap-4 text-sm">
+      <span class="hidden sm:flex items-center gap-1.5" style="color:#6b7a99;">
+        <i class="fas fa-lock text-gold text-xs" style="color:#c9972a;"></i> Encrypted &amp; Secure
+      </span>
+      <button onclick="logout()" class="nav-link text-sm" style="color:#6b7a99;" title="Log out">
+        <i class="fas fa-right-from-bracket"></i>
+      </button>
     </div>
   </div>
 </header>
@@ -385,6 +411,7 @@
       <div>
         <label class="block font-semibold text-sm text-navy mb-2" style="color:#0d1b3e;">2. Email Address <span style="color:#c9972a;">*</span></label>
         <input type="email" class="field-input" id="q2" placeholder="e.g. alex@example.com" />
+        <p class="text-xs mt-1" style="color:#6b7a99;" id="q2-hint"></p>
         <div class="err-msg" id="err-q2">Please enter a valid email.</div>
       </div>
 
@@ -921,9 +948,10 @@
           </li>
         </ul>
       </div>
-      <a href="index.html" class="btn-primary">
-        <i class="fas fa-home text-sm"></i> Back to Home
+      <a href="dashboard.html" class="btn-primary" id="go-dashboard-btn">
+        <i class="fas fa-gauge-high text-sm"></i> Go to My Dashboard
       </a>
+      <p class="text-xs mt-4" style="color:#9ca3af;" id="redirect-note">Redirecting automatically in <span id="redirect-count">5</span>s…</p>
     </div>
   </div>
 
@@ -948,7 +976,65 @@
   <a href="#" style="color:#c9972a;" class="hover:underline">Privacy Policy</a>
 </div>
 
+<div id="toast-wrap"></div>
+
 <script>
+  /* ══════════════════════════════════════════════
+     AUTH GUARD — shared session with dashboard.html
+     Uses the SAME localStorage keys ('access_token', 'user')
+     that dashboard.html reads/writes, so a user who logs in
+     once moves seamlessly between login → survey → dashboard.
+  ══════════════════════════════════════════════ */
+  function getToken() { return localStorage.getItem('access_token'); }
+
+  function logout() {
+    if (!confirm('Are you sure you want to log out?')) return;
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('user');
+    window.location.replace('/login.html');
+  }
+
+  function requireAuthOrRedirect() {
+    const token = getToken();
+    if (!token) {
+      window.location.replace('/login.html?next=survey.html');
+      return false;
+    }
+    return true;
+  }
+
+  function prefillFromAccount() {
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const nameParts = [user.first_name, user.last_name].filter(Boolean);
+      if (nameParts.length) document.getElementById('q1').value = nameParts.join(' ');
+      if (user.email) {
+        const emailField = document.getElementById('q2');
+        emailField.value = user.email;
+        emailField.readOnly = true;
+        document.getElementById('q2-hint').textContent = "This is the email on your Algosark account.";
+      }
+    } catch (e) { /* no stored user yet — leave fields editable */ }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    if (!requireAuthOrRedirect()) return;
+    prefillFromAccount();
+    document.getElementById('auth-gate').classList.add('hide');
+  });
+
+  /* ══════════════════════════════════════════════
+     TOASTS
+  ══════════════════════════════════════════════ */
+  function showToast(message) {
+    const wrap = document.getElementById('toast-wrap');
+    const el = document.createElement('div');
+    el.className = 'toast error';
+    el.innerHTML = `<i class="fas fa-triangle-exclamation"></i><span>${message}</span>`;
+    wrap.appendChild(el);
+    setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; setTimeout(() => el.remove(), 300); }, 4000);
+  }
+
   // ── State ───────────────────────────────────────────
   let currentSection = 1;
   const TOTAL_SECTIONS = 7;
@@ -1111,30 +1197,6 @@
     updateProgress();
   }
 
-  document.getElementById('btn-next').addEventListener('click', () => {
-    if (!validateSection(currentSection)) return;
-    if (currentSection === TOTAL_SECTIONS) {
-      // Submit
-      document.querySelectorAll('.survey-card').forEach(c => c.classList.remove('active'));
-      document.getElementById('success-screen').classList.add('show');
-      document.getElementById('nav-btns').style.display = 'none';
-      // Set progress to 100%
-      document.getElementById('progress-fill').style.width = '100%';
-      document.getElementById('pct-label').textContent = '100%';
-      document.getElementById('section-name').textContent = 'Survey Complete ✓';
-      document.getElementById('q-counter').textContent = '35 of 35 questions answered';
-      for (let i = 1; i <= TOTAL_SECTIONS; i++) {
-        const dot = document.getElementById('dot-' + i);
-        dot.classList.remove('active');
-        dot.classList.add('done');
-      }
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else {
-      currentSection++;
-      showSection(currentSection);
-    }
-  });
-
   document.getElementById('btn-prev').addEventListener('click', () => {
     if (currentSection > 1) {
       currentSection--;
@@ -1142,124 +1204,171 @@
     }
   });
 
+  // ── Helper: read selected values out of the DOM ─────
+  function getSelectedValue(groupId) {
+    const selected = document.getElementById(groupId)?.querySelector('.opt-btn.selected');
+    return selected ? selected.dataset.val : null;
+  }
+  function getSelectedValues(groupId) {
+    const chips = document.getElementById(groupId)?.querySelectorAll('.chip-btn.selected');
+    return chips ? Array.from(chips).map(chip => chip.dataset.val) : [];
+  }
+
+  // ── Submit ───────────────────────────────────────────
+  async function submitSurvey() {
+    const submitBtn = document.getElementById('btn-next');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin text-sm"></i> Submitting…';
+    submitBtn.disabled = true;
+
+    const token = getToken();
+    if (!token) {
+      showToast('Your session expired. Redirecting to login…');
+      setTimeout(() => window.location.replace('/login.html?next=survey.html'), 1200);
+      return;
+    }
+
+    const payload = {
+      // SECTION 1
+      full_name: document.getElementById('q1').value.trim(),
+      email: document.getElementById('q2').value.trim(),
+      age_range: getSelectedValue('q3'),
+      country: document.getElementById('q4').value,
+      employment_status: getSelectedValue('q5'),
+
+      // SECTION 2
+      trading_experience: getSelectedValue('q6'),
+      asset_classes: getSelectedValues('q7'),
+      algo_familiarity: getSelectedValue('q8'),
+      coding_background: getSelectedValue('q9'),
+      trading_frequency: getSelectedValue('q10'),
+
+      // SECTION 3
+      annual_income: getSelectedValue('q11'),
+      net_worth: getSelectedValue('q12'),
+      initial_capital: getSelectedValue('q13'),
+      debts: getSelectedValue('q14'),
+      emergency_fund: getSelectedValue('q15'),
+
+      // SECTION 4
+      max_monthly_loss: parseFloat(document.getElementById('q16').value),
+      reaction_to_20pct_loss: getSelectedValue('q17'),
+      return_profile: getSelectedValue('q18'),
+      investment_horizon: getSelectedValue('q19'),
+      past_loss_experience: getSelectedValue('q20'),
+
+      // SECTION 5
+      target_markets: getSelectedValues('q21'),
+      preferred_style: getSelectedValue('q22'),
+      excluded_sectors: document.getElementById('q23').value.trim(),
+      leverage_preference: getSelectedValue('q24'),
+      long_short_preference: getSelectedValue('q25'),
+
+      // SECTION 6
+      brokerages: getSelectedValues('q26'),
+      account_type: getSelectedValue('q27'),
+      api_comfort_level: getSelectedValue('q28'),
+      trading_sessions: getSelectedValues('q29'),
+      overnight_weekend: getSelectedValue('q30'),
+
+      // SECTION 7
+      primary_motivation: getSelectedValue('q31'),
+      target_annual_return: getSelectedValue('q32'),
+      max_simultaneous_positions: getSelectedValue('q33'),
+      additional_constraints: document.getElementById('q34').value.trim(),
+
+      // Declarations
+      decl_risk_capital: document.getElementById('decl1').checked,
+      decl_past_performance: document.getElementById('decl2').checked,
+      decl_consent: document.getElementById('decl3').checked,
+      decl_over_18: document.getElementById('decl4').checked,
+    };
+
+    try {
+      const response = await fetch('/survey/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.status === 401) {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('user');
+        showToast('Your session expired. Please log in again.');
+        setTimeout(() => window.location.replace('/login.html?next=survey.html'), 1200);
+        return;
+      }
+
+      const result = await response.json().catch(() => ({}));
+
+      if (response.ok) {
+        onSubmitSuccess();
+      } else {
+        showToast('Submission failed: ' + (result.detail || 'Please try again.'));
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+      }
+    } catch (error) {
+      console.error('Survey submit error:', error);
+      showToast('Failed to submit — check your connection and try again.');
+      submitBtn.innerHTML = originalText;
+      submitBtn.disabled = false;
+    }
+  }
+
+  function onSubmitSuccess() {
+    document.querySelectorAll('.survey-card').forEach(c => c.classList.remove('active'));
+    document.getElementById('success-screen').classList.add('show');
+    document.getElementById('nav-btns').style.display = 'none';
+
+    document.getElementById('progress-fill').style.width = '100%';
+    document.getElementById('pct-label').textContent = '100%';
+    document.getElementById('section-name').textContent = 'Survey Complete ✓';
+    document.getElementById('q-counter').textContent = '35 of 35 questions answered';
+    for (let i = 1; i <= TOTAL_SECTIONS; i++) {
+      const dot = document.getElementById('dot-' + i);
+      dot.classList.remove('active');
+      dot.classList.add('done');
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // Mark survey_completed locally so dashboard.html can skip re-prompting,
+    // then auto-redirect to the dashboard's Paper Trading / Strategy view.
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      user.survey_completed = true;
+      localStorage.setItem('user', JSON.stringify(user));
+    } catch (e) {}
+
+    let secondsLeft = 5;
+    const countEl = document.getElementById('redirect-count');
+    const timer = setInterval(() => {
+      secondsLeft -= 1;
+      if (countEl) countEl.textContent = secondsLeft;
+      if (secondsLeft <= 0) {
+        clearInterval(timer);
+        window.location.href = 'dashboard.html';
+      }
+    }, 1000);
+  }
+
+  // Single, authoritative Continue/Submit handler.
+  document.getElementById('btn-next').addEventListener('click', () => {
+    if (!validateSection(currentSection)) return;
+    if (currentSection === TOTAL_SECTIONS) {
+      submitSurvey();
+    } else {
+      currentSection++;
+      showSection(currentSection);
+    }
+  });
+
   // Init
   showSection(1);
-  
-  // Collect and submit survey data
-  async function submitSurvey() {
-      // Show loading state
-      const submitBtn = document.getElementById('btn-next');
-      const originalText = submitBtn.innerHTML;
-      submitBtn.innerHTML = 'Submitting...';
-      submitBtn.disabled = true;
-
-      try {
-          const data = {
-              // SECTION 1
-              full_name: document.getElementById('q1').value.trim(),
-              email: document.getElementById('q2').value.trim(),
-              age_range: getSelectedValue('q3'),
-              country: document.getElementById('q4').value,
-              employment_status: getSelectedValue('q5'),
-
-              // SECTION 2
-              trading_experience: getSelectedValue('q6'),
-              asset_classes: getSelectedValues('q7'),
-              algo_familiarity: getSelectedValue('q8'),
-              coding_background: getSelectedValue('q9'),
-              trading_frequency: getSelectedValue('q10'),
-
-              // SECTION 3
-              annual_income: getSelectedValue('q11'),
-              net_worth: getSelectedValue('q12'),
-              initial_capital: getSelectedValue('q13'),
-              debts: getSelectedValue('q14'),
-              emergency_fund: getSelectedValue('q15'),
-
-              // SECTION 4
-              max_monthly_loss: parseFloat(document.getElementById('q16').value),
-              reaction_to_20pct_loss: getSelectedValue('q17'),
-              return_profile: getSelectedValue('q18'),
-              investment_horizon: getSelectedValue('q19'),
-              past_loss_experience: getSelectedValue('q20'),
-
-              // SECTION 5
-              target_markets: getSelectedValues('q21'),
-              preferred_style: getSelectedValue('q22'),
-              excluded_sectors: document.getElementById('q23').value.trim(),
-              leverage_preference: getSelectedValue('q24'),
-              long_short_preference: getSelectedValue('q25'),
-
-              // SECTION 6
-              brokerages: getSelectedValues('q26'),
-              account_type: getSelectedValue('q27'),
-              api_comfort_level: getSelectedValue('q28'),
-              trading_sessions: getSelectedValues('q29'),
-              overnight_weekend: getSelectedValue('q30'),
-
-              // SECTION 7
-              primary_motivation: getSelectedValue('q31'),
-              target_annual_return: getSelectedValue('q32'),
-              max_simultaneous_positions: getSelectedValue('q33'),
-              additional_constraints: document.getElementById('q34').value.trim(),
-
-              // Declarations
-              decl_risk_capital: document.getElementById('decl1').checked,
-              decl_past_performance: document.getElementById('decl2').checked,
-              decl_consent: document.getElementById('decl3').checked,
-              decl_over_18: document.getElementById('decl4').checked,
-          };
-
-          const response = await fetch('http://127.0.0.1:8000/survey/submit', {
-              method: 'POST',
-              headers: { 
-                  'Content-Type': 'application/json',
-                  'Accept': 'application/json'
-              },
-              body: JSON.stringify(data)
-          });
-
-          const result = await response.json();
-
-          if (response.ok) {
-              // Show success screen
-              document.querySelectorAll('.survey-card').forEach(c => c.classList.remove('active'));
-              document.getElementById('success-screen').classList.add('show');
-              document.getElementById('nav-btns').style.display = 'none';
-          } else {
-              alert('Submission failed: ' + (result.detail || 'Please try again'));
-          }
-      } catch (error) {
-          console.error('Error:', error);
-          alert('Failed to submit survey. Please check your connection.');
-      } finally {
-          submitBtn.innerHTML = originalText;
-          submitBtn.disabled = false;
-      }
-  }
-
-  // Helper functions
-  function getSelectedValue(groupId) {
-      const selected = document.getElementById(groupId)?.querySelector('.opt-btn.selected');
-      return selected ? selected.dataset.val : null;
-  }
-
-  function getSelectedValues(groupId) {
-      const chips = document.getElementById(groupId)?.querySelectorAll('.chip-btn.selected');
-      return chips ? Array.from(chips).map(chip => chip.dataset.val) : [];
-  }
-
-  // Replace the current submit button listener
-  document.getElementById('btn-next').addEventListener('click', () => {
-      if (!validateSection(currentSection)) return;
-      
-      if (currentSection === TOTAL_SECTIONS) {
-          submitSurvey();           // ← Call our new function
-      } else {
-          currentSection++;
-          showSection(currentSection);
-      }
-  });
 </script>
 </body>
 </html>

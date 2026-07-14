@@ -1,0 +1,1 @@
+{"targets": ["max_drawdown_target", "risk_per_trade", "target_annual_return", "leverage", "max_positions", "holding_period_days"], "regimes": ["trending", "mean_reverting", "volatile", "crisis"]}

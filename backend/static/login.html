@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -38,14 +39,12 @@
 
     .display-font { font-family: 'DM Serif Display', Georgia, serif; }
 
-    /* ── LAYOUT ── */
     .auth-layout {
       display: flex;
       width: 100%;
       min-height: 100vh;
     }
 
-    /* ── LEFT PANEL ── */
     .auth-left {
       width: 48%;
       background: linear-gradient(150deg, var(--navy) 0%, var(--navy700) 55%, var(--navy500) 100%);
@@ -57,7 +56,6 @@
       padding: 2.5rem 3rem;
     }
 
-    /* Decorative grid lines */
     .auth-left::before {
       content: '';
       position: absolute;
@@ -68,7 +66,6 @@
       background-size: 48px 48px;
     }
 
-    /* Gold glow blobs */
     .auth-left::after {
       content: '';
       position: absolute;
@@ -148,7 +145,6 @@
       margin-bottom: 2.5rem;
     }
 
-    /* Mini stats */
     .panel-stats {
       display: flex;
       flex-direction: column;
@@ -175,7 +171,6 @@
     .stat-label { font-size: .8rem; color: var(--slate-dark); line-height: 1.3; }
     .stat-val { font-size: 1rem; font-weight: 600; color: var(--white); }
 
-    /* Equity mini chart */
     .mini-chart-wrap {
       background: rgba(255,255,255,.04);
       border: 1px solid rgba(201,151,42,.15);
@@ -200,7 +195,6 @@
       line-height: 1.6;
     }
 
-    /* ── RIGHT PANEL ── */
     .auth-right {
       flex: 1;
       display: flex;
@@ -265,7 +259,6 @@
     }
     .auth-subtitle a:hover { text-decoration: underline; }
 
-    /* Social sign-in */
     .social-row {
       display: flex;
       gap: .75rem;
@@ -287,6 +280,7 @@
       cursor: pointer;
       transition: border-color .2s, background .2s, box-shadow .2s;
       text-decoration: none;
+      font-family: inherit;
     }
     .social-sign-btn:hover {
       border-color: var(--gold);
@@ -294,6 +288,7 @@
       box-shadow: 0 2px 12px rgba(201,151,42,.12);
     }
     .social-sign-btn svg { width: 18px; height: 18px; }
+    .social-sign-btn:disabled { opacity: .6; cursor: wait; }
 
     .divider {
       display: flex;
@@ -310,7 +305,6 @@
       background: var(--slate-mid);
     }
 
-    /* Form */
     .form-group {
       margin-bottom: 1.1rem;
     }
@@ -355,7 +349,6 @@
     .form-input:focus + .input-icon,
     .input-wrap:focus-within .input-icon { color: var(--gold); }
 
-    /* password toggle */
     .pw-toggle {
       position: absolute;
       right: 14px;
@@ -399,7 +392,6 @@
     }
     .forgot-link:hover { text-decoration: underline; }
 
-    /* Submit button */
     .btn-submit {
       width: 100%;
       display: flex;
@@ -436,7 +428,6 @@
     .btn-submit:hover::after { transform: translateX(100%); }
     .btn-submit:active { transform: translateY(0); }
 
-    /* Loading state */
     .btn-submit .spinner {
       display: none;
       width: 18px; height: 18px;
@@ -461,7 +452,6 @@
     }
     .auth-alt a:hover { color: var(--gold); }
 
-    /* Trust badges */
     .trust-row {
       display: flex;
       justify-content: center;
@@ -479,7 +469,6 @@
     }
     .trust-item i { color: var(--gold); }
 
-    /* Mobile header (shown on small screens) */
     .mobile-auth-header {
       display: none;
       justify-content: space-between;
@@ -499,7 +488,6 @@
     }
     .mobile-logo-text span { color: var(--gold); }
 
-    /* Error state */
     .input-error .form-input {
       border-color: #ef4444;
       box-shadow: 0 0 0 3px rgba(239,68,68,.1);
@@ -512,7 +500,6 @@
     }
     .input-error .error-msg { display: block; }
 
-    /* Success flash */
     .success-toast {
       display: none;
       background: #f0fdf4;
@@ -527,7 +514,6 @@
     }
     .success-toast.show { display: flex; }
 
-    /* Animations */
     @keyframes shimmer {
       0%   { background-position: -200% center; }
       100% { background-position: 200% center; }
@@ -544,7 +530,6 @@
 
     .auth-box { animation: fadeUp .6s ease both; }
 
-    /* Responsive */
     @media (max-width: 900px) {
       .auth-left { display: none; }
       .auth-right { padding: 0; justify-content: flex-start; }
@@ -555,7 +540,6 @@
 </head>
 <body>
 
-<!-- Mobile top nav (hidden on desktop) -->
 <div style="display:flex; flex-direction:column; flex:1;">
   <div class="mobile-auth-header">
     <a href="index.html" class="mobile-logo-text">Algos<span>ark</span></a>
@@ -564,17 +548,14 @@
 
   <div class="auth-layout">
 
-    <!-- LEFT decorative panel -->
     <div class="auth-left">
       <div class="blob-top"></div>
 
-      <!-- Logo -->
       <a href="index.html" class="panel-logo">
         <div class="panel-logo-icon">A</div>
         <span class="panel-logo-text">Algos<span>ark</span></span>
       </a>
 
-      <!-- Hero copy -->
       <div class="panel-hero">
         <p class="panel-tagline">
           Your market.<br/>
@@ -585,7 +566,6 @@
           Welcome back. Your personalised algo trading strategy is running. Log in to check your performance, adjust parameters, or go live.
         </p>
 
-        <!-- Mini equity chart -->
         <div class="mini-chart-wrap">
           <div class="mini-chart-header">
             <span class="mini-chart-title">Strategy equity · Paper trading</span>
@@ -604,7 +584,6 @@
           </svg>
         </div>
 
-        <!-- Stats -->
         <div class="panel-stats">
           <div class="stat-row">
             <div class="stat-icon"><i class="fas fa-shield-alt"></i></div>
@@ -623,14 +602,12 @@
         </div>
       </div>
 
-      <!-- Footer -->
       <p class="panel-footer">
         Trading in financial products involves significant risk. Past performance is not indicative of future results.<br/>
         © 2026 Algosark. FCA-aware design.
       </p>
     </div>
 
-    <!-- RIGHT form panel -->
     <div class="auth-right">
       <div class="auth-box">
 
@@ -645,7 +622,6 @@
           </p>
         </div>
 
-        <!-- Success toast (shown after demo) -->
         <div class="success-toast" id="successToast">
           <i class="fas fa-check-circle"></i>
           Logged in successfully. Redirecting to your dashboard…
@@ -653,16 +629,16 @@
 
         <!-- Social sign-in -->
         <div class="social-row">
-          <a href="#" class="social-sign-btn">
+          <button type="button" class="social-sign-btn" id="googleBtn">
             <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
               <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
               <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
               <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
             </svg>
-            Google
-          </a>
-          <a href="#" class="social-sign-btn">
+            <span id="googleBtnText">Google</span>
+          </button>
+          <a href="http://localhost:8000/auth/github/login" class="social-sign-btn" id="githubBtn">
             <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="var(--ink)">
               <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
             </svg>
@@ -672,7 +648,6 @@
 
         <div class="divider">or continue with email</div>
 
-        <!-- Login form -->
         <form id="loginForm" novalidate>
           <div class="form-group" id="emailGroup">
             <label class="form-label" for="email">Email address</label>
@@ -714,7 +689,6 @@
           New to Algosark? <a href="register.html">Create a free account</a>
         </div>
 
-        <!-- Trust row -->
         <div class="trust-row">
           <span class="trust-item"><i class="fas fa-lock"></i> 256-bit SSL</span>
           <span class="trust-item"><i class="fas fa-shield-alt"></i> FCA-aware</span>
@@ -724,7 +698,7 @@
     </div>
 
   </div>
-</div><!-- end flex wrapper -->
+</div>
 
 <style>
   @keyframes pulse {
@@ -734,7 +708,74 @@
 </style>
 
 <script>
-  // Password show/hide
+  // ─── Config: change these to your real deployed URLs ───
+  const BACKEND_URL = 'http://localhost:8000';
+  const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
+
+  // The GitHub button is a plain link (href set above) — clicking it does a
+  // full-page redirect straight to the backend, which handles the rest.
+  // Nothing to wire up in JS for GitHub.
+
+  // ─── Google sign-in (popup code flow) ───
+  let googleCodeClient = null;
+  const googleBtn = document.getElementById('googleBtn');
+  const googleBtnText = document.getElementById('googleBtnText');
+
+  function initGoogleClient() {
+    if (!window.google || !google.accounts || !google.accounts.oauth2) {
+      // GIS script hasn't loaded yet (slow network, blocked script, etc.)
+      googleBtn.disabled = true;
+      googleBtnText.textContent = 'Google (unavailable)';
+      return;
+    }
+    googleCodeClient = google.accounts.oauth2.initCodeClient({
+      client_id: GOOGLE_CLIENT_ID,
+      scope: 'openid email profile',
+      ux_mode: 'popup',
+      callback: handleGoogleCodeResponse,
+    });
+  }
+
+  async function handleGoogleCodeResponse(response) {
+    if (response.error) {
+      // e.g. user closed the popup — not necessarily a real error
+      console.warn('Google sign-in did not complete:', response.error);
+      return;
+    }
+
+    googleBtn.disabled = true;
+    googleBtnText.textContent = 'Signing in…';
+
+    try {
+      const res = await fetch(`${BACKEND_URL}/auth/google/callback`, {
+        method: 'POST',
+        credentials: 'include', // needed so the session cookie gets set
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: response.code }),
+      });
+
+      if (!res.ok) throw new Error(`Backend rejected the code (${res.status})`);
+
+      window.location.href = 'dashboard.html';
+    } catch (err) {
+      console.error(err);
+      alert('Google sign-in failed. Please try again.');
+      googleBtn.disabled = false;
+      googleBtnText.textContent = 'Google';
+    }
+  }
+
+  googleBtn.addEventListener('click', () => {
+    if (googleCodeClient) {
+      googleCodeClient.requestCode();
+    } else {
+      alert('Google sign-in is still loading — try again in a moment.');
+    }
+  });
+
+  window.addEventListener('load', initGoogleClient);
+
+  // ─── Existing password login (unchanged) ───
   const pwToggle = document.getElementById('pwToggle');
   const pwInput  = document.getElementById('password');
   const pwIcon   = document.getElementById('pwIcon');
@@ -744,7 +785,6 @@
     pwIcon.className = show ? 'fas fa-eye-slash' : 'fas fa-eye';
   });
 
-  // Form validation + demo submit
   const form      = document.getElementById('loginForm');
   const loginBtn  = document.getElementById('loginBtn');
   const toast     = document.getElementById('successToast');
@@ -779,11 +819,11 @@
     loginBtn.classList.add('loading');
     loginBtn.disabled = true;
 
-    fetch('http://127.0.0.1:8000/login', {
+    fetch('api/login', {
         method: 'POST',
         headers: { 
             'Content-Type': 'application/json',
-            'Accept': 'application/json'
+            'Accept': 'application/json',
         },
         body: JSON.stringify({
             email: document.getElementById('email').value,
@@ -797,8 +837,10 @@
       loginBtn.classList.remove('loading');
       loginBtn.disabled = false;
       toast.classList.add('show');
+
+      localStorage.setItem('access_token', data.access_token);
+
       setTimeout(() => {
-        // In real app: redirect to dashboard
         window.location.href = 'dashboard.html';
       }, 1800);
     }).catch(err => {
@@ -809,7 +851,6 @@
     });
   });
 
-  // Clear error on input
   ['email','password'].forEach(id => {
     document.getElementById(id).addEventListener('input', () => {
       document.getElementById(id === 'email' ? 'emailGroup' : 'passwordGroup')
