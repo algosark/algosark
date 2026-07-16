@@ -17,13 +17,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, JSONResponse
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import sessionmaker, Session, Session, Mapped, relationship
 import secrets
 from backend.main import SessionLocal
 from models import User
 
 from typing import Optional
 
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 db = SessionLocal()
 load_dotenv()
 
