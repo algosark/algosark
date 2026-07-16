@@ -17,6 +17,9 @@ from jose import JWTError, jwt
 import json
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from starlette.middleware.sessions import SessionMiddleware
+from social_login import router as social_router
+from models import User
 
 # ====================== DATABASE SETUP ======================
 DATABASE_URL = "sqlite:///./users.db"
@@ -33,10 +36,17 @@ app = FastAPI(title="Algosark API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://127.0.0.1:8000", "http://127.0.0.1:5500", "null"],
+    allow_origins=["http://127.0.0.1:8000", "null"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.environ["SESSION_SECRET"],
+    same_site="lax",
+    https_only=False,
 )
 
 # NOTE: tokenUrl must match the actual login route below. Your login route
@@ -71,27 +81,6 @@ def serve_dashboard_page():
 @app.get("/register.html")
 def serve_register_page():
     return FileResponse("static/register.html")
-
-
-class User(Base):
-    __tablename__ = "users"
-
-    id = Column(Integer, primary_key=True, index=True)
-    first_name = Column(String(100), nullable=False)
-    last_name = Column(String(100), nullable=False)
-    email = Column(String(255), unique=True, index=True, nullable=False)
-    password_hash: Mapped[str] = mapped_column(String(255))
-    trading_experience = Column(Text, nullable=True)  # e.g., "2 years", "Beginner", etc.
-    marketing_opt_in = Column(Integer, default=0)  # 0 = No, 1 = Yes
-    survey_completed = Column(Boolean, default=False)
-    survey_submitted_at = Column(DateTime, nullable=True)
-    survey_response = relationship("SurveyResponse", back_populates="user", uselist=False)
-    created_at = Column(String(50), default=lambda: datetime.utcnow().isoformat())
-    updated_at = Column(
-        String(50),
-        default=lambda: datetime.utcnow().isoformat(),
-        onupdate=lambda: datetime.utcnow().isoformat(),
-    )
 
 
 def create_access_token(data: dict, expires_delta: timedelta = None):
@@ -350,3 +339,4 @@ app.include_router(build_strategy_router(get_db, get_current_user, SurveyRespons
 app.include_router(build_broker_router(get_db, get_current_user))
 app.include_router(build_trading_router(get_db, get_current_user, Trade))
 app.include_router(build_profile_router(get_db, get_current_user, UserResponse))
+app.include_router(social_router)

@@ -710,7 +710,7 @@
 <script>
   // ─── Config: change these to your real deployed URLs ───
   const BACKEND_URL = 'http://localhost:8000';
-  const GOOGLE_CLIENT_ID = '125437989737-5scubm78bn3p2ogh2bdaq36v30qson9t.apps.googleusercontent.com';
+  const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
 
   // The GitHub button is a plain link (href set above) — clicking it does a
   // full-page redirect straight to the backend, which handles the rest.
@@ -838,7 +838,7 @@
       loginBtn.disabled = false;
       toast.classList.add('show');
 
-      localStorage.setItem('authToken', data.access_token);
+      localStorage.setItem('access_token', data.access_token);
 
       setTimeout(() => {
         window.location.href = 'dashboard.html';
