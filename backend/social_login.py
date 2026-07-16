@@ -1,11 +1,6 @@
 """
 Algosark auth backend — Google + GitHub OAuth.
 
-Run:
-    pip install -r requirements.txt
-    cp .env.example .env   # then fill in real values
-    uvicorn main:app --reload --port 8000
-
 This is a minimal, correct implementation of the *mechanics* of OAuth
 (state verification, code exchange, token/id_token verification, session
 cookie). Swap `create_or_get_user` for real DB calls before shipping.
@@ -24,9 +19,12 @@ from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 from sqlalchemy.orm import Session
 import secrets
+from backend.main import SessionLocal
 from models import User
 
+from typing import Optional
 
+db = SessionLocal()
 load_dotenv()
 
 GOOGLE_CLIENT_ID = os.environ["GOOGLE_CLIENT_ID"]
@@ -50,7 +48,7 @@ router = APIRouter(tags=["Social Login"])
 # same eTLD+1, or a dev proxy). If frontend/backend are on totally different
 # origins in production, use same_site="none" + https_only=True (requires HTTPS).
 
-def create_or_get_user(db: Session, provider: str, provider_user_id: str, email: str, name: str | None = None):
+def create_or_get_user(db: Session, provider: str, provider_user_id: str, email: Optional[str], name: Optional[str] = None):
     
     user = db.query(User).filter(User.email == email).first()
 
@@ -97,7 +95,7 @@ async def github_login(request: Request):
 
 
 @router.get("/auth/github/callback")
-async def github_callback(request: Request, code: str | None = None, state: str | None = None, error: str | None = None):
+async def github_callback(request: Request, code: Optional[str] = None, state: Optional[str] = None, error: Optional[str] = None):
     if error:
         return RedirectResponse(f"{FRONTEND_URL}/login.html?error=github_denied")
 
@@ -137,7 +135,7 @@ async def github_callback(request: Request, code: str | None = None, state: str 
             primary = next((e for e in emails if e.get("primary")), None)
             email = primary["email"] if primary else None
 
-    account = create_or_get_user("github", str(user["id"]), email, user.get("name") or user.get("login"))
+    account = create_or_get_user(db, "github", str(user["id"]), email, user.get("name") or user.get("login"))
     request.session["user"] = account
 
     return RedirectResponse(f"{FRONTEND_URL}/dashboard.html")
@@ -182,7 +180,7 @@ async def google_callback(request: Request, payload: GoogleCodePayload):
         if claims.get("aud") != GOOGLE_CLIENT_ID:
             raise HTTPException(400, "Token audience mismatch")
 
-    account = create_or_get_user("google", claims["sub"], claims.get("email"), claims.get("name"))
+    account = create_or_get_user(db, "google", claims["sub"], claims.get("email"), claims.get("name"))
     request.session["user"] = account
 
     return JSONResponse({"ok": True, "user": account})
