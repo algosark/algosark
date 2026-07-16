@@ -17,12 +17,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, JSONResponse
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session, Session, Mapped, relationship
 import secrets
 from models import User
 
 from typing import Optional
 
+DATABASE_URL = "sqlite:///./users.db"
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 db = SessionLocal()
 load_dotenv()
