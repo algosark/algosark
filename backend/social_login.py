@@ -19,7 +19,6 @@ from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 from sqlalchemy.orm import sessionmaker, Session, Session, Mapped, relationship
 import secrets
-from backend.main import SessionLocal
 from models import User
 
 from typing import Optional
