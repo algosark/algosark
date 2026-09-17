@@ -873,6 +873,8 @@
 </div>
 
 <script>
+
+  const backendUrl = 'https://algosark.co.uk/';
   // Password toggle
   const pwToggle = document.getElementById('pwToggle');
   const pwInput  = document.getElementById('password');
@@ -982,7 +984,7 @@
     btn.classList.add('loading');
     btn.disabled = true;
 
-    fetch('http://127.0.0.1:8000/api/register', {
+    fetch(`${backendUrl}api/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
