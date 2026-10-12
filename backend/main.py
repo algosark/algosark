@@ -20,23 +20,20 @@ from fastapi.responses import FileResponse
 from starlette.middleware.sessions import SessionMiddleware
 from social_login import router as social_router
 from models import User
+from database import engine, SessionLocal, Base
+
 
 # ====================== DATABASE SETUP ======================
-DATABASE_URL = "sqlite:///./users.db"
 SECRET_KEY = "your-super-secret-key-change-this"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
-
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
 
 # ====================== FASTAPI APP ======================
 app = FastAPI(title="Algosark API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://127.0.0.1:8000", "null"],
+    allow_origins=["http://127.0.0.1:8000", "https://algosark.co.uk", "null"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -63,20 +60,21 @@ app.mount("/static", StaticFiles(directory="static", html=True), name="static")
 def serve_survey_page():
     return FileResponse("static/survey.html")
 
-
 @app.get("/login.html")
 def serve_login_page():
     return FileResponse("static/login.html")
-
 
 @app.get("/index.html")
 def serve_index_page():
     return FileResponse("static/index.html")
 
-
 @app.get("/dashboard.html")
 def serve_dashboard_page():
     return FileResponse("static/dashboard.html")
+
+@app.get("/pricing.html")
+def serve_pricing_page():
+    return FileResponse("static/pricing.html")
 
 @app.get("/register.html")
 def serve_register_page():
@@ -310,11 +308,9 @@ def submit_survey(
 
     return {"message": "Survey submitted successfully!", "survey_id": db_survey.id}
 
-
 @app.get("/")
 def root():
-    return {"message": "Algosark API is running"}
-
+    return FileResponse("static/index.html")
 
 # ====================== SPSG STRATEGY ENGINE + BROKER + TRADING + PROFILE ======================
 # All four of these are additive: they define their own tables (bound to the

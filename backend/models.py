@@ -1,12 +1,8 @@
 from sqlalchemy import DateTime, create_engine, Column, Integer, Float, String, Text, Boolean, ForeignKey
-from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime, timedelta
 from sqlalchemy.orm import sessionmaker, Session, Mapped, relationship
-
-
-
-Base = declarative_base()
+from database import Base
 
 
 class User(Base):
