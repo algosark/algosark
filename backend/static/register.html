@@ -8,7 +8,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-   <script src="config.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -847,6 +846,22 @@
               <span class="btn-text"><i class="fas fa-rocket" style="font-size:.85rem;"></i>&nbsp; Create Free Account</span>
               <div class="spinner"></div>
             </button>
+
+            <div id="registrationError"
+                role="alert"
+                aria-live="assertive"
+                style="
+                  display:none;
+                  background:#fef2f2;
+                  border:1px solid #fecaca;
+                  color:#b91c1c;
+                  padding:12px 15px;
+                  border-radius:10px;
+                  font-size:0.85rem;
+                  margin-bottom:15px;
+                  line-height:1.5;
+                ">
+            </div>
           </form>
 
           <div class="auth-alt">
@@ -874,8 +889,6 @@
 </div>
 
 <script>
-
-  const backendUrl = environment.BACKEND_URL;
   // Password toggle
   const pwToggle = document.getElementById('pwToggle');
   const pwInput  = document.getElementById('password');
@@ -978,41 +991,129 @@
   const form = document.getElementById('registerForm');
   const btn  = document.getElementById('registerBtn');
 
-  form.addEventListener('submit', e => {
+  
+
+form.addEventListener('submit', async (e) => {
     e.preventDefault();
+
+    const errorBox = document.getElementById('registrationError');
+    errorBox.style.display = 'none';
+    errorBox.textContent = '';
+
     if (!validate()) return;
 
     btn.classList.add('loading');
     btn.disabled = true;
 
-    fetch(`${backendUrl}api/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        first_name: document.getElementById('firstName').value.trim(),
-        last_name: document.getElementById('lastName').value.trim(),
-        email: document.getElementById('email').value.trim(),
-        password: document.getElementById('password').value,
-        trading_experience: document.getElementById('experience').value,
-        marketingOptIn: document.getElementById('marketing').checked
-      })
-    }).then(res => {
-      if (!res.ok) throw new Error('Registration failed');
-      return res.json();
-    }).then(data => {
-      btn.classList.remove('loading');
-      btn.disabled = false;
-      document.getElementById('formWrap').style.display = 'none';
-      document.getElementById('successOverlay').classList.add('show');
-      setTimeout(() => {
-        window.location.href = 'survey.html?referral_page=register';
-      }, 2500);
-    }).catch(err => {
-      btn.classList.remove('loading');
-      btn.disabled = false;
-      console.error(err);
-    });
-  });
+    try {
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
+
+        const response = await fetch(
+            `${window.location.origin}/api/register`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    first_name: document.getElementById('firstName').value.trim(),
+                    last_name: document.getElementById('lastName').value.trim(),
+                    email: email,
+                    password: password,
+                    trading_experience: document.getElementById('experience').value,
+                    marketingOptIn: document.getElementById('marketing').checked
+                })
+            }
+        );
+
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok || data.success === false) {
+            let message = data.detail || data.message || data.error;
+
+            if (Array.isArray(message)) {
+                message = message.map(err => err.msg).join('. ');
+            }
+
+            if (typeof message !== 'string' || !message.trim()) {
+                message = 'Registration failed. Please try again.';
+            }
+
+            throw new Error(message);
+        }
+
+        // Automatically log in the registered user
+        let token = data.access_token;
+        let user = data.user;
+
+        // If registration does not return a token, log in separately
+        if (!token) {
+            const loginResponse = await fetch(
+                `${window.location.origin}/api/login`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: email,
+                        password: password
+                    })
+                }
+            );
+
+            const loginData = await loginResponse.json().catch(() => ({}));
+
+            if (!loginResponse.ok || !loginData.access_token) {
+                throw new Error(
+                    'Account created successfully, but automatic login failed. Please log in manually.'
+                );
+            }
+
+            token = loginData.access_token;
+            user = loginData.user || user;
+        }
+
+        // Save authentication session
+        localStorage.setItem('access_token', token);
+
+        if (user) {
+            localStorage.setItem('user', JSON.stringify(user));
+        }
+
+        // Display registration success
+        document.getElementById('formWrap').style.display = 'none';
+        document.getElementById('successOverlay').classList.add('show');
+
+        // Redirect authenticated user to survey
+        setTimeout(() => {
+            window.location.replace(
+                `${window.location.origin}/survey.html?referral_page=register`
+            );
+        }, 2500);
+
+    } catch (err) {
+        console.error('Registration/Login error:', err);
+
+        errorBox.textContent =
+            err instanceof TypeError
+                ? 'Unable to connect to the server. Please try again.'
+                : err.message;
+
+        errorBox.style.display = 'block';
+        errorBox.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center'
+        });
+
+    } finally {
+        btn.classList.remove('loading');
+        btn.disabled = false;
+    }
+});
+
+
 
   // terms checkbox clears error
   ['terms','risk'].forEach(id => {

@@ -9,7 +9,6 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <script src="https://cdn.tailwindcss.com"></script>
-   <script src="config.js"></script>
   <script>
     tailwind.config = {
       theme: {
@@ -987,8 +986,6 @@
      once moves seamlessly between login → survey → dashboard.
   ══════════════════════════════════════════════ */
 
-  const backendUrl = environment.BACKEND_URL;
-
   function getToken() { return localStorage.getItem('access_token'); }
 
   function logout() {
@@ -1289,7 +1286,7 @@
     };
 
     try {
-      const response = await fetch('/survey/submit', {
+      const response = await fetch( `${window.location.origin}/survey/submit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
