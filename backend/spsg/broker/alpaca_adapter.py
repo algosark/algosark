@@ -57,7 +57,18 @@ class AlpacaAdapter(BrokerAdapter):
     def _post(self, path: str, body: dict) -> dict:
         url = f"{self._base_url}{path}"
         resp = requests.post(url, headers=self._headers(), json=body, timeout=15)
-        resp.raise_for_status()
+        try:
+            resp.raise_for_status()
+        except requests.HTTPError as exc:
+            try:
+                payload = resp.json()
+            except ValueError:
+                detail = resp.text or str(exc)
+            else:
+                detail = payload.get("message", payload) if isinstance(payload, dict) else payload
+            raise RuntimeError(
+                f"Alpaca API returned HTTP {resp.status_code}: {detail}"
+            ) from exc
         return resp.json()
 
     def _delete(self, path: str) -> dict:
@@ -95,16 +106,25 @@ class AlpacaAdapter(BrokerAdapter):
         self, symbol: str, qty: float, side: OrderSide, order_type: OrderType = "market",
         limit_price: float | None = None, stop_price: float | None = None,
     ) -> BrokerOrder:
+        if not symbol.strip():
+            raise ValueError("A symbol is required.")
+        if qty <= 0:
+            raise ValueError("Order quantity must be greater than zero.")
+
         body = {
-            "symbol": symbol,
+            "symbol": symbol.strip().upper(),
             "qty": str(qty),
             "side": side,
             "type": order_type,
             "time_in_force": "day",
         }
-        if order_type == "limit" and limit_price is not None:
+        if order_type == "limit":
+            if limit_price is None or limit_price <= 0:
+                raise ValueError("A positive limit_price is required for limit orders.")
             body["limit_price"] = str(limit_price)
-        if order_type == "stop" and stop_price is not None:
+        if order_type == "stop":
+            if stop_price is None or stop_price <= 0:
+                raise ValueError("A positive stop_price is required for stop orders.")
             body["stop_price"] = str(stop_price)
 
         data = self._post("/v2/orders", body)

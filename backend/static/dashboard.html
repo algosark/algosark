@@ -1967,6 +1967,11 @@ async function placeOrder() {
   const tp = parseFloat(document.getElementById('orderTP').value) || null;
   const limitPrice = parseFloat(document.getElementById('orderPrice').value) || null;
 
+  if (orderType !== 'market' && (!limitPrice || limitPrice <= 0)) {
+    showToast('error', 'Order failed', `Enter a positive ${orderType} price.`);
+    return;
+  }
+
   if (mode === 'live') {
     const confirmed = confirm(`Place a LIVE ${orderSide.toUpperCase()} order for ${qty} ${symbol}? This uses real capital.`);
     if (!confirmed) return;
@@ -1980,7 +1985,8 @@ async function placeOrder() {
     method: 'POST',
     body: JSON.stringify({
       symbol, side: orderSide, qty, mode, order_type: orderType,
-      limit_price: orderType !== 'market' ? limitPrice : null,
+      limit_price: orderType === 'limit' ? limitPrice : null,
+      stop_price: orderType === 'stop' ? limitPrice : null,
       sl, tp,
     }),
   });
