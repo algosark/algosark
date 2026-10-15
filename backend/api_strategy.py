@@ -140,8 +140,12 @@ def build_strategy_router(get_db, get_current_user, SurveyResponse, Strategy) ->
             db.commit()
             return {"user_id": user_id, "strategy": existing.payload, "already_generated": True}
 
+        phase = "engine initialization"
         try:
-            result = get_spsg_engine().generate_strategy(_survey_row_to_dict(survey))
+            engine = get_spsg_engine()
+            phase = "strategy generation"
+            result = engine.generate_strategy(_survey_row_to_dict(survey))
+            phase = "database save"
             strategy = Strategy(
                 user_id=user_id,
                 strategy_name=result["strategy_name"],
@@ -159,10 +163,17 @@ def build_strategy_router(get_db, get_current_user, SurveyResponse, Strategy) ->
             db.commit()
         except Exception as exc:
             db.rollback()
-            logger.exception("Admin strategy generation failed for user_id=%s", user_id)
+            logger.exception(
+                "Admin strategy generation failed during %s for user_id=%s",
+                phase,
+                user_id,
+            )
             raise HTTPException(
                 status_code=500,
-                detail="Strategy generation failed. The server logged the underlying error; contact support if retrying does not work.",
+                detail=(
+                    f"Strategy generation failed during {phase} "
+                    f"({type(exc).__name__}): {exc}"
+                ),
             ) from exc
         return {"user_id": user_id, "strategy": result, "already_generated": False}
 

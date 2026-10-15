@@ -1,7 +1,33 @@
+# Environment variables and secrets
 .env
-../.venv
-.venv
-venv
-users.db
-__pycache__
-spsg/broker/__pycache__
+.env.*
+!.env.example
+
+# Python virtual environments
+.venv/
+venv/
+backend/.venv/
+backend/venv/
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+
+# Testing and coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE and operating system files
+.vscode/
+.idea/
+.DS_Store
