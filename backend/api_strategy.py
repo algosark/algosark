@@ -19,6 +19,8 @@ Wire-up in main.py (add near the bottom, after `Base.metadata.create_all`):
 """
 
 from __future__ import annotations
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -34,6 +36,7 @@ from spsg.broker import AlpacaAdapter
 # so we keep a single module-level instance rather than re-instantiating per request.
 # ----------------------------------------------------------------------------
 _engine_instance: SPSGEngine | None = None
+logger = logging.getLogger(__name__)
 
 
 def get_spsg_engine() -> SPSGEngine:
@@ -129,17 +132,25 @@ def build_strategy_router(get_db, get_current_user, SurveyResponse, Strategy) ->
         if existing:
             return {"user_id": user_id, "strategy": existing.payload, "already_generated": True}
 
-        result = get_spsg_engine().generate_strategy(_survey_row_to_dict(survey))
-        strategy = Strategy(
-            user_id=user_id,
-            strategy_name=result["strategy_name"],
-            risk_profile_score=result["risk_profile_score"],
-            detected_regime=result["regime_detection"]["detected_regime"],
-            payload=result,
-            is_active=1,
-        )
-        db.add(strategy)
-        db.commit()
+        try:
+            result = get_spsg_engine().generate_strategy(_survey_row_to_dict(survey))
+            strategy = Strategy(
+                user_id=user_id,
+                strategy_name=result["strategy_name"],
+                risk_profile_score=result["risk_profile_score"],
+                detected_regime=result["regime_detection"]["detected_regime"],
+                payload=result,
+                is_active=1,
+            )
+            db.add(strategy)
+            db.commit()
+        except Exception as exc:
+            db.rollback()
+            logger.exception("Admin strategy generation failed for user_id=%s", user_id)
+            raise HTTPException(
+                status_code=500,
+                detail="Strategy generation failed. The server logged the underlying error; contact support if retrying does not work.",
+            ) from exc
         return {"user_id": user_id, "strategy": result, "already_generated": False}
 
     @router.get("/me")

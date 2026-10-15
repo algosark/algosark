@@ -27,8 +27,20 @@ refuses to use the shared account if it is configured as live. Without these
 credentials, the local simulated paper adapter is used instead.
 
 GitHub OAuth must use the callback URL configured in `GITHUB_REDIRECT_URI`.
-Google and GitHub redirect/browser configuration must also allow the frontend
-origin in their provider consoles.
+In Google Cloud Console, configure the OAuth client ID matching
+`GOOGLE_CLIENT_ID` as a **Web application** and add each browser origin where
+the app is served under **Authorized JavaScript origins** (for this
+deployment: `https://algosark.co.uk`; also add `https://www.algosark.co.uk`
+if users access the site through `www`). Enter origins only—scheme and host,
+with no path or trailing slash. For local development, add
+`http://localhost:8000` and/or `http://127.0.0.1:8000` if those are the
+origins actually used in the browser. The Google popup code flow exchanges
+the code at the backend; this is not a Google redirect URI setting.
+
+For GitHub, register the exact callback URL from `GITHUB_REDIRECT_URI`
+(`https://algosark.co.uk/auth/github/callback` for this deployment) in the
+OAuth App's **Authorization callback URL**. The browser origin and provider
+callback URL are different settings.
 
 ## 3. Pre-train the SPSG ensemble (optional but recommended)
 

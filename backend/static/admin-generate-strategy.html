@@ -25,6 +25,10 @@
     document.getElementById('generateButton').addEventListener('click', async event => {
       const button = event.currentTarget;
       const message = document.getElementById('message');
+      if (!token) {
+        message.textContent = 'This admin link is missing its token. Open the latest strategy notification email and use its link.';
+        return;
+      }
       button.disabled = true;
       try {
         const response = await fetch('/strategy/admin-generate', {
@@ -32,8 +36,24 @@
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({token}),
         });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.detail || 'Strategy generation failed.');
+        const responseText = await response.text();
+        let data;
+        try {
+          data = responseText ? JSON.parse(responseText) : {};
+        } catch {
+          const statusMessage = response.status
+            ? `Server returned HTTP ${response.status}.`
+            : 'The server returned an unreadable response.';
+          throw new Error(response.status >= 500
+            ? `The server failed while generating the strategy (${statusMessage}) Check the backend logs or contact support.`
+            : statusMessage);
+        }
+        if (!response.ok) {
+          throw new Error(data.detail || `Strategy generation failed (HTTP ${response.status}).`);
+        }
+        if (!data.strategy?.strategy_name) {
+          throw new Error('The server response did not include a generated strategy name.');
+        }
         message.textContent = `Strategy generated for user ${data.user_id}: ${data.strategy.strategy_name}`;
       } catch (error) {
         message.textContent = error.message || 'Strategy generation failed.';
