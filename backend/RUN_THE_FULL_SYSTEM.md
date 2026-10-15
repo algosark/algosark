@@ -89,8 +89,17 @@ Visit `http://127.0.0.1:8000/index.html` (or `/login.html` to start).
 | My Strategy tab | `POST /strategy/request`, `POST /strategy/admin-generate`, `GET /strategy/me`, `GET /strategy/history` | `api_strategy.py`, `account_notifications.py`, `spsg/` |
 | Settings → Broker Connection | `POST /broker/connect`, `GET /broker/status`, `GET /broker/account` | `api_strategy.py`, `broker_registry.py` |
 | Trade tab — chart + timeframes | `GET /trading/bars`, `GET /trading/quote` | `api_trading.py` |
+| Trade tab — supported Alpaca assets | `GET /trading/assets` | `api_trading.py`, `spsg/broker/alpaca_adapter.py` |
 | Trade tab — place/close orders | `POST /trading/orders`, `POST /trading/orders/{id}/close` | `api_trading.py` |
 | Positions / History tabs | `GET /trading/positions`, `GET /trading/orders` | `api_trading.py` |
+| Dashboard notification bell | Recent strategy, paper-trade, and live-trade activity | `static/dashboard.html` |
+
+Order entry searches Alpaca's active, tradable US-equity catalog and validates
+the selected asset and fractional-share eligibility again before submission.
+For a personal Alpaca connection, recent broker orders are merged into the
+order list in the selected mode. The shared paper account's broker-wide history
+is intentionally not exposed across users; each user's site-created orders
+remain visible from their own records.
 
 ## 7. Database
 
@@ -108,9 +117,10 @@ the Alpaca REST adapter, trade persistence, timeframe-aware chart data.
 **Placeholder, clearly flagged in code/API responses:**
 - SPSG training data is rule-distilled synthetic data (no real subscriber
   outcomes exist yet) — see `README_SPSG_INTEGRATION.md`.
-- Trade fills fall back to synthetic prices when no broker is connected for
-  the requested mode — every trade record has `"source": "broker"` or
-  `"source": "synthetic"` so this is never silently hidden from the user.
+- Paper orders use the configured shared Alpaca paper account or the local
+  paper simulator when no Alpaca keys are configured. Live orders require a
+  user's own live Alpaca connection. The synthetic order fallback remains
+  defensive; trade rows identify their source explicitly.
 - `broker_registry.py` stores connections in process memory — fine for one
   worker/one process, not production-ready for multi-worker deployments
   (documented in that file's docstring with the exact fix needed).

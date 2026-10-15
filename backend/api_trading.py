@@ -133,6 +133,7 @@ def _trade_to_dict(t) -> dict:
         "status": t.status,
         "pnl": t.pnl,
         "source": t.source,
+        "broker_order_id": t.broker_order_id,
         "close_reason": t.close_reason,
         "opened_at": t.opened_at.isoformat() if t.opened_at else None,
         "closed_at": t.closed_at.isoformat() if t.closed_at else None,
@@ -145,15 +146,74 @@ def build_trading_router(get_db, get_current_user, Trade) -> APIRouter:
     # ------------------------------------------------------------------
     # Orders
     # ------------------------------------------------------------------
+    @router.get("/assets")
+    def list_tradable_assets(
+        mode: Mode = Query(default="paper"),
+        search: str = Query(default="", max_length=40),
+        limit: int = Query(default=50, ge=1, le=100),
+        current_user=Depends(get_current_user),
+    ):
+        if mode == "paper":
+            adapter = broker_registry.ensure_paper_adapter(current_user.id)
+        else:
+            adapter = broker_registry.get_adapter(current_user.id, mode)
+            if not adapter:
+                raise HTTPException(
+                    status_code=400,
+                    detail="No live broker connected. Connect a personal Alpaca account first.",
+                )
+        if not hasattr(adapter, "get_tradable_assets"):
+            raise HTTPException(
+                status_code=501,
+                detail="This broker does not provide a tradable-asset catalog.",
+            )
+        try:
+            assets = adapter.get_tradable_assets()
+        except Exception as exc:  # noqa: BLE001 - surface upstream asset-catalog errors
+            raise HTTPException(
+                status_code=502,
+                detail=f"Could not load Alpaca's tradable assets: {exc}",
+            ) from exc
+
+        query = search.strip().upper()
+        if query:
+            assets = [
+                asset for asset in assets
+                if query in asset["symbol"] or query in str(asset.get("name") or asset["symbol"]).upper()
+            ]
+        return {"assets": assets[:limit]}
+
     @router.post("/orders", status_code=status.HTTP_201_CREATED)
     def place_order(
         body: OrderCreateRequest,
         db: Session = Depends(get_db),
         current_user=Depends(get_current_user),
     ):
-        adapter = broker_registry.get_adapter(current_user.id, body.mode)
+        adapter = (
+            broker_registry.ensure_paper_adapter(current_user.id)
+            if body.mode == "paper"
+            else broker_registry.get_adapter(current_user.id, body.mode)
+        )
 
         if adapter:
+            if hasattr(adapter, "get_tradable_asset"):
+                try:
+                    asset = adapter.get_tradable_asset(body.symbol)
+                except Exception as exc:  # noqa: BLE001 - surface upstream asset-catalog errors
+                    raise HTTPException(
+                        status_code=502,
+                        detail=f"Could not verify the Alpaca asset: {exc}",
+                    ) from exc
+                if not asset:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"{body.symbol.strip().upper()} is not an active, tradable Alpaca US equity.",
+                    )
+                if not asset["fractionable"] and not float(body.qty).is_integer():
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"{asset['symbol']} does not support fractional-share quantities.",
+                    )
             try:
                 broker_order = adapter.place_order(
                     symbol=body.symbol, qty=body.qty, side=body.side,
@@ -248,7 +308,70 @@ def build_trading_router(get_db, get_current_user, Trade) -> APIRouter:
         if status_filter:
             q = q.filter(Trade.status == status_filter)
         rows = q.order_by(Trade.id.desc()).limit(limit).all()
-        return [_trade_to_dict(t) for t in rows]
+        trades = [_trade_to_dict(t) for t in rows]
+
+        adapter = broker_registry.get_adapter(current_user.id, mode) if mode else None
+        include_broker_history = (
+            mode is not None
+            and status_filter is None
+            and adapter is not None
+            and hasattr(adapter, "get_orders")
+            and not broker_registry.is_shared_paper_adapter(current_user.id)
+        )
+        if not include_broker_history:
+            return trades
+
+        try:
+            broker_orders = adapter.get_orders(limit=limit)
+        except Exception as exc:  # noqa: BLE001 - broker order history must not silently disappear
+            raise HTTPException(
+                status_code=502,
+                detail=f"Could not load Alpaca order history: {exc}",
+            ) from exc
+
+        trade_by_broker_id = {
+            trade["broker_order_id"]: trade
+            for trade in trades
+            if trade["broker_order_id"]
+        }
+        merged = []
+        included_ids = set()
+        for order in broker_orders:
+            broker_order_id = order.get("id")
+            if not broker_order_id:
+                continue
+            trade = trade_by_broker_id.get(broker_order_id)
+            if trade:
+                included_ids.add(broker_order_id)
+            opened_at = order.get("submitted_at") or order.get("created_at")
+            merged.append({
+                **(trade or {}),
+                "id": trade["id"] if trade else None,
+                "broker_order_id": broker_order_id,
+                "mode": mode,
+                "symbol": order.get("symbol") or (trade or {}).get("symbol"),
+                "side": order.get("side") or (trade or {}).get("side"),
+                "order_type": order.get("type") or (trade or {}).get("order_type", "market"),
+                "qty": float(order.get("qty") or (trade or {}).get("qty") or 0),
+                "entry_price": float(
+                    order.get("filled_avg_price")
+                    or (trade or {}).get("entry_price")
+                    or order.get("limit_price")
+                    or order.get("stop_price")
+                    or 0
+                ),
+                "status": order.get("status") or (trade or {}).get("status", "unknown"),
+                "trade_status": (trade or {}).get("status"),
+                "source": "broker",
+                "opened_at": opened_at,
+            })
+
+        merged.extend(
+            trade for trade in trades
+            if not trade["broker_order_id"] or trade["broker_order_id"] not in included_ids
+        )
+        merged.sort(key=lambda item: item.get("opened_at") or "", reverse=True)
+        return merged[:limit]
 
     @router.get("/positions")
     def list_positions(

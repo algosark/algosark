@@ -12,6 +12,7 @@ from .base import BrokerAccount, BrokerAdapter, BrokerOrder, BrokerPosition, Ord
 class PaperTradingAdapter(BrokerAdapter):
     provider_name = "algosark-paper"
     STARTING_CASH = 10_000.0
+    SUPPORTED_ASSETS = ("AAPL", "TSLA")
     _START_PRICES = {
         "AAPL": 228.0, "BTCUSD": 67_000.0, "EURUSD": 1.09,
         "FTSE100": 8_245.0, "GBPUSD": 1.27, "SPX": 5_487.0,
@@ -70,6 +71,20 @@ class PaperTradingAdapter(BrokerAdapter):
                 unrealized_pl=(price - position["avg_entry_price"]) * signed_qty,
             ))
         return result
+
+    def get_tradable_assets(self) -> list[dict]:
+        self._ensure_connected()
+        return [
+            {"symbol": symbol, "name": symbol, "exchange": "SIMULATED", "fractionable": True}
+            for symbol in self.SUPPORTED_ASSETS
+        ]
+
+    def get_tradable_asset(self, symbol: str) -> dict | None:
+        normalized = symbol.strip().upper()
+        return next(
+            (asset for asset in self.get_tradable_assets() if asset["symbol"] == normalized),
+            None,
+        )
 
     def place_order(
         self, symbol: str, qty: float, side: OrderSide, order_type: OrderType = "market",

@@ -177,6 +177,36 @@ body {
   font-size: .8rem; color: var(--slate);
 }
 .icon-btn:hover { border-color: var(--gold); color: var(--gold); }
+.notification-wrap { position: relative; }
+.notification-badge {
+  position: absolute; top: -5px; right: -5px; min-width: 15px; height: 15px;
+  display: none; align-items: center; justify-content: center;
+  padding: 0 4px; border-radius: 99px; background: var(--red); color: #fff;
+  border: 1px solid var(--bg); font: 700 9px var(--sans);
+}
+.notification-badge.visible { display: flex; }
+.notification-panel {
+  position: absolute; top: 42px; right: 0; width: min(340px, calc(100vw - 2rem));
+  max-height: 420px; overflow-y: auto; display: none; z-index: 110;
+  background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r);
+  box-shadow: 0 12px 32px rgba(0,0,0,.5);
+}
+.notification-panel.open { display: block; }
+.notification-panel-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: .75rem .85rem; border-bottom: 1px solid var(--border);
+  font-size: .78rem; font-weight: 700;
+}
+.notification-list { padding: .25rem; }
+.notification-item {
+  width: 100%; display: block; padding: .7rem; text-align: left; cursor: pointer;
+  border: 0; border-radius: 6px; background: transparent; color: var(--white);
+}
+.notification-item:hover { background: var(--bg3); }
+.notification-item.unread { background: var(--gold-pale); }
+.notification-title { font-size: .75rem; font-weight: 600; }
+.notification-message { margin-top: 3px; color: var(--slate); font-size: .68rem; line-height: 1.4; }
+.notification-empty { padding: 1.1rem .8rem; color: var(--slate); font-size: .75rem; text-align: center; }
 
 /* Avatar dropdown */
 .avatar-menu {
@@ -797,7 +827,15 @@ canvas#priceChart { width:100% !important; height:100% !important; }
     <div class="topbar-prices" id="topbarPrices"></div>
 
     <div class="topbar-right">
-      <div class="icon-btn" title="Notifications">🔔</div>
+      <div class="notification-wrap">
+        <button class="icon-btn" id="notificationBell" type="button" title="Notifications"
+          aria-label="Notifications" aria-expanded="false" onclick="toggleNotifications()">🔔</button>
+        <span class="notification-badge" id="notificationBadge" aria-hidden="true"></span>
+        <div class="notification-panel" id="notificationPanel" role="dialog" aria-label="Notifications">
+          <div class="notification-panel-header"><span>Notifications</span><span id="notificationCount" class="text-slate"></span></div>
+          <div class="notification-list" id="notificationList"><div class="notification-empty">Loading notifications…</div></div>
+        </div>
+      </div>
       <div class="icon-btn" title="Settings" onclick="showView('settings', document.querySelector('.nav-item[data-view=settings]'))">⚙️</div>
       <div class="avatar-wrap">
         <div class="avatar" onclick="toggleAvatarMenu()">TK</div>
@@ -1013,16 +1051,10 @@ canvas#priceChart { width:100% !important; height:100% !important; }
             </div>
             <div class="field-row">
               <label>Symbol</label>
-              <select id="orderSymbol" onchange="syncChartSymbol()">
-                <option value="GBPUSD">GBP/USD</option>
-                <option value="EURUSD">EUR/USD</option>
-                <option value="USDJPY">USD/JPY</option>
-                <option value="BTCUSD">BTC/USD</option>
-                <option value="AAPL">AAPL</option>
-                <option value="TSLA">TSLA</option>
-                <option value="FTSE100">FTSE 100</option>
-                <option value="SPX">S&P 500</option>
-              </select>
+              <input type="text" id="orderSymbol" value="AAPL" list="tradableAssetSuggestions"
+                autocomplete="off" oninput="searchTradableAssets(this.value)" onchange="syncChartSymbol()"/>
+              <datalist id="tradableAssetSuggestions"></datalist>
+              <small class="muted" id="assetSearchStatus">Loading active, tradable US stocks…</small>
             </div>
             <div class="field-row" id="priceFieldWrap" style="display:none">
               <label>Limit / Stop Price</label>
@@ -1701,6 +1733,8 @@ let currentTF = '1d';
 let orderSide = 'buy';
 let orderType = 'market';
 let lastBarCloses = [];
+let assetSearchTimer;
+let assetSearchRequest = 0;
 
 const SYNTHETIC_STARTING_BALANCE = 10000;
 let equityHistory = [SYNTHETIC_STARTING_BALANCE];
@@ -1879,13 +1913,61 @@ function setTF(el, tf) {
 
 function changeSymbol() {
   currentSym = document.getElementById('chartSymbol').value;
-  document.getElementById('orderSymbol').value = currentSym;
   loadChart();
 }
 function syncChartSymbol() {
-  currentSym = document.getElementById('orderSymbol').value;
-  document.getElementById('chartSymbol').value = currentSym;
+  const symbol = document.getElementById('orderSymbol').value.trim().toUpperCase();
+  document.getElementById('orderSymbol').value = symbol;
+  currentSym = symbol;
+  const chartSymbol = document.getElementById('chartSymbol');
+  if ([...chartSymbol.options].some(option => option.value === symbol)) {
+    chartSymbol.value = symbol;
+  }
   loadChart();
+}
+
+async function loadTradableAssets(search = '') {
+  const requestId = ++assetSearchRequest;
+  const status = document.getElementById('assetSearchStatus');
+  const symbolInput = document.getElementById('orderSymbol');
+  if (status) status.textContent = 'Loading active, tradable US stocks…';
+  const { ok, data } = await apiFetch(
+    `/trading/assets?mode=${mode}&search=${encodeURIComponent(search)}&limit=50`
+  );
+  if (requestId !== assetSearchRequest) return;
+  const suggestions = document.getElementById('tradableAssetSuggestions');
+  if (!ok || !data?.assets) {
+    if (status) status.textContent = data?.detail || 'Unable to load tradable assets. Retry by searching again.';
+    if (mode === 'live' && symbolInput) symbolInput.disabled = true;
+    suggestions.replaceChildren();
+    return;
+  }
+  if (symbolInput) symbolInput.disabled = false;
+  suggestions.replaceChildren(...data.assets.map(asset => {
+    const option = document.createElement('option');
+    option.value = asset.symbol;
+    option.label = asset.name && asset.name !== asset.symbol
+      ? `${asset.symbol} — ${asset.name}`
+      : asset.symbol;
+    return option;
+  }));
+  if (status) {
+    status.textContent = data.assets.length
+      ? 'Choose a tradable Alpaca US stock. Orders are verified with Alpaca before submission.'
+      : 'No active, tradable Alpaca assets matched that search.';
+  }
+}
+
+function searchTradableAssets(search) {
+  clearTimeout(assetSearchTimer);
+  const query = search.trim();
+  const status = document.getElementById('assetSearchStatus');
+  if (query.length < 1) {
+    if (status) status.textContent = 'Type a symbol or company name to search Alpaca tradable assets.';
+    document.getElementById('tradableAssetSuggestions').replaceChildren();
+    return;
+  }
+  assetSearchTimer = setTimeout(() => loadTradableAssets(query), 250);
 }
 
 /* ══════════════════════════════════════════
@@ -1932,6 +2014,7 @@ async function setMode(m) {
   loadChart();
   loadPositions();
   loadOrders();
+  loadTradableAssets('');
   refreshAccountSummary();
 }
 
@@ -2001,6 +2084,7 @@ async function placeOrder() {
     loadPositions();
     loadOrders();
     refreshAccountSummary();
+    refreshNotifications();
   } else {
     showToast('error', 'Order failed', (data && data.detail) || 'Could not place order.');
   }
@@ -2019,6 +2103,7 @@ async function closeTradePosition(id, reason='manual') {
     loadOrders();
     loadHistory();
     refreshAccountSummary();
+    refreshNotifications();
   } else {
     showToast('error', 'Close failed', (data && data.detail) || 'Could not close position.');
   }
@@ -2067,9 +2152,19 @@ async function loadPositions() {
 
 async function loadOrders() {
   const { ok, data } = await apiFetch(`/trading/orders?mode=${mode}&limit=20`);
-  const rows = ok && data ? data : [];
   const body = document.getElementById('recentOrdersBody');
   if (!body) return;
+  if (!ok || !Array.isArray(data)) {
+    const row = document.createElement('tr');
+    const cell = document.createElement('td');
+    cell.colSpan = 8;
+    cell.style.cssText = 'text-align:center;color:var(--red);padding:1.5rem';
+    cell.textContent = data?.detail || 'Could not load broker order history. Please retry.';
+    row.append(cell);
+    body.replaceChildren(row);
+    return;
+  }
+  const rows = data;
   if (rows.length === 0) {
     body.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--slate);padding:1.5rem">No orders placed yet</td></tr>';
     return;
@@ -2140,6 +2235,176 @@ function updateAnalyticsFromHistory(rows) {
     setEl('an-avgloss', `-£${Math.abs(avgLoss).toFixed(2)}`, 'var(--red)');
     setEl('an-pf',  (grossW/grossL).toFixed(2));
     renderPnlDistChart(rows);
+  }
+}
+
+let notificationItems = [];
+let notificationLoadError = '';
+let notificationsOpen = false;
+
+function notificationStorageKey() {
+  let user = {};
+  try { user = JSON.parse(localStorage.getItem('user') || '{}'); } catch (e) {}
+  return `algosark-notifications-read-${user.id || user.email || 'account'}`;
+}
+
+function readNotificationIds() {
+  try {
+    const ids = JSON.parse(localStorage.getItem(notificationStorageKey()) || '[]');
+    return new Set(Array.isArray(ids) ? ids : []);
+  } catch (e) {
+    return new Set();
+  }
+}
+
+function renderNotifications() {
+  const list = document.getElementById('notificationList');
+  const badge = document.getElementById('notificationBadge');
+  const count = document.getElementById('notificationCount');
+  if (!list || !badge || !count) return;
+
+  const readIds = readNotificationIds();
+  const unreadCount = notificationItems.filter(item => !readIds.has(item.id)).length;
+  badge.textContent = unreadCount > 9 ? '9+' : String(unreadCount);
+  badge.classList.toggle('visible', unreadCount > 0);
+  count.textContent = unreadCount ? `${unreadCount} new` : 'Up to date';
+  document.getElementById('notificationBell')?.setAttribute(
+    'aria-label',
+    unreadCount ? `Notifications, ${unreadCount} unread` : 'Notifications'
+  );
+
+  list.replaceChildren();
+  if (notificationLoadError) {
+    const message = document.createElement('div');
+    message.className = 'notification-empty';
+    message.textContent = notificationLoadError;
+    const retry = document.createElement('button');
+    retry.type = 'button';
+    retry.className = 'btn-outline';
+    retry.textContent = 'Retry';
+    retry.style.margin = '0 auto .75rem';
+    retry.addEventListener('click', refreshNotifications);
+    list.append(message, retry);
+  }
+  if (!notificationItems.length) {
+    const empty = document.createElement('div');
+    empty.className = 'notification-empty';
+    empty.textContent = 'No new account, strategy, or trade notifications.';
+    list.append(empty);
+    return;
+  }
+
+  notificationItems.forEach(item => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `notification-item${readIds.has(item.id) ? '' : ' unread'}`;
+    const title = document.createElement('div');
+    title.className = 'notification-title';
+    title.textContent = item.title;
+    const message = document.createElement('div');
+    message.className = 'notification-message';
+    message.textContent = item.message;
+    button.append(title, message);
+    button.addEventListener('click', () => openNotification(item));
+    list.append(button);
+  });
+}
+
+function markNotificationsRead() {
+  const readIds = readNotificationIds();
+  notificationItems.forEach(item => readIds.add(item.id));
+  localStorage.setItem(
+    notificationStorageKey(),
+    JSON.stringify([...readIds].slice(-300))
+  );
+  renderNotifications();
+}
+
+function openNotification(item) {
+  markNotificationsRead();
+  const panel = document.getElementById('notificationPanel');
+  const bell = document.getElementById('notificationBell');
+  panel?.classList.remove('open');
+  bell?.setAttribute('aria-expanded', 'false');
+  notificationsOpen = false;
+  showView(item.destination === 'strategy' ? 'strategy' : 'trade');
+}
+
+async function refreshNotifications() {
+  const [paperOrders, liveOrders, strategy] = await Promise.all([
+    apiFetch('/trading/orders?mode=paper&limit=10'),
+    apiFetch('/trading/orders?mode=live&limit=10'),
+    apiFetch('/strategy/me'),
+  ]);
+  const failedOrders = [paperOrders, liveOrders].find(response => !response.ok);
+  if (failedOrders) {
+    notificationLoadError = failedOrders.data?.detail || 'Could not load recent trading notifications.';
+  } else {
+    notificationLoadError = '';
+  }
+  if (!strategy.ok && strategy.status !== 404) {
+    notificationLoadError = strategy.data?.detail || 'Could not load strategy notifications.';
+  }
+
+  const items = [];
+  if (strategy.ok && strategy.data?.status === 'pending') {
+    items.push({
+      id: 'strategy-request-pending',
+      title: 'Strategy request received',
+      message: 'The strategy team has been notified and will review your request.',
+      destination: 'strategy',
+    });
+  } else if (strategy.ok && strategy.data?.strategy_name) {
+    const history = await apiFetch('/strategy/history');
+    const latest = history.ok && Array.isArray(history.data) ? history.data[0] : null;
+    items.push({
+      id: `strategy-ready-${latest?.id || strategy.data.strategy_name}`,
+      title: 'Your strategy is ready',
+      message: `${strategy.data.strategy_name} is available to review.`,
+      destination: 'strategy',
+    });
+  }
+
+  [
+    { response: paperOrders, name: 'Paper' },
+    { response: liveOrders, name: 'Live' },
+  ].forEach(({ response, name }) => {
+    if (!response.ok) return;
+    (Array.isArray(response.data) ? response.data : []).slice(0, 5).forEach(order => {
+      const state = String(order.status || 'updated').toLowerCase();
+      const tradeState = String(order.trade_status || '').toLowerCase();
+      const isClosed = tradeState === 'closed' || state === 'closed';
+      const closeReason = String(order.close_reason || '').toLowerCase();
+      let title;
+      if (isClosed && closeReason === 'stop_loss') title = `${name} stop loss hit`;
+      else if (isClosed && closeReason === 'take_profit') title = `${name} take profit hit`;
+      else if (isClosed) title = `${name} position closed`;
+      else if (tradeState === 'open' || state === 'open') title = `${name} position opened`;
+      else title = `${name} order ${state.replaceAll('_', ' ')}`;
+      items.push({
+        id: `trade-${name.toLowerCase()}-${order.broker_order_id || order.id}-${tradeState}-${state}`,
+        title,
+        message: `${String(order.side || '').toUpperCase()} ${order.qty} ${order.symbol}`,
+        destination: 'trade',
+        timestamp: order.closed_at || order.opened_at,
+      });
+    });
+  });
+  notificationItems = items.sort(
+    (a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime()
+  );
+  renderNotifications();
+}
+
+async function toggleNotifications() {
+  notificationsOpen = !notificationsOpen;
+  const panel = document.getElementById('notificationPanel');
+  const bell = document.getElementById('notificationBell');
+  panel?.classList.toggle('open', notificationsOpen);
+  bell?.setAttribute('aria-expanded', String(notificationsOpen));
+  if (notificationsOpen) {
+    await refreshNotifications();
+    markNotificationsRead();
   }
 }
 
@@ -2615,13 +2880,23 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
 
   await refreshBrokerStatus();
+  await loadTradableAssets('');
   const requestedView = new URLSearchParams(window.location.search).get('view');
   if (requestedView === 'strategy') showView('strategy');
   await loadBrokerProviders();
+  document.addEventListener('click', event => {
+    if (!event.target.closest('.notification-wrap')) {
+      notificationsOpen = false;
+      document.getElementById('notificationPanel')?.classList.remove('open');
+      document.getElementById('notificationBell')?.setAttribute('aria-expanded', 'false');
+    }
+  });
 
   // Instant paint from cache, then reconcile with the server.
   loadProfileFromStorage();
-  loadUserFromAPI();
+  await loadUserFromAPI();
+  await refreshNotifications();
+  setInterval(refreshNotifications, 30000);
 
   updateTopbarPrices();
 
@@ -2648,6 +2923,11 @@ window.addEventListener('DOMContentLoaded', async () => {
       loadQuote();
     }
   }, 5000);
+  setInterval(() => {
+    if (document.getElementById('view-trade')?.classList.contains('active')) {
+      loadOrders();
+    }
+  }, 30000);
 
   // Canvas resize handler
   window.addEventListener('resize', () => {

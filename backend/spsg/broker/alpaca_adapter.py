@@ -16,6 +16,7 @@ as-is; test it there with real (or Alpaca's free paper) API keys.
 
 from __future__ import annotations
 import os
+import time
 import requests
 
 from .base import BrokerAdapter, BrokerAccount, BrokerPosition, BrokerOrder, OrderSide, OrderType
@@ -33,6 +34,8 @@ class AlpacaAdapter(BrokerAdapter):
         self._api_secret: str | None = None
         self._base_url: str | None = None
         self._is_paper: bool = True
+        self._tradable_assets_cache: list[dict] = []
+        self._tradable_assets_cached_at = 0.0
 
     def connect(self, api_key: str, api_secret: str, paper: bool = True) -> None:
         self._api_key = api_key
@@ -48,7 +51,9 @@ class AlpacaAdapter(BrokerAdapter):
             "APCA-API-SECRET-KEY": self._api_secret,
         }
 
-    def _get(self, path: str, base: str | None = None, params: dict | None = None) -> dict:
+    def _get(
+        self, path: str, base: str | None = None, params: dict | None = None
+    ) -> dict | list[dict]:
         url = f"{base or self._base_url}{path}"
         resp = requests.get(url, headers=self._headers(), params=params, timeout=15)
         resp.raise_for_status()
@@ -102,6 +107,45 @@ class AlpacaAdapter(BrokerAdapter):
             for p in data
         ]
 
+    def get_tradable_assets(self) -> list[dict]:
+        if time.monotonic() - self._tradable_assets_cached_at > 300:
+            assets = self._get(
+                "/v2/assets",
+                params={"status": "active", "asset_class": "us_equity"},
+            )
+            if not isinstance(assets, list):
+                raise RuntimeError("Alpaca returned an invalid tradable-assets response.")
+            self._tradable_assets_cache = [
+                {
+                    "symbol": asset["symbol"],
+                    "name": asset.get("name", asset["symbol"]),
+                    "exchange": asset.get("exchange"),
+                    "fractionable": bool(asset.get("fractionable")),
+                }
+                for asset in assets
+                if asset.get("status") == "active"
+                and asset.get("tradable") is True
+                and asset.get("class") == "us_equity"
+            ]
+            self._tradable_assets_cached_at = time.monotonic()
+        return self._tradable_assets_cache
+
+    def get_tradable_asset(self, symbol: str) -> dict | None:
+        normalized = symbol.strip().upper()
+        return next(
+            (asset for asset in self.get_tradable_assets() if asset["symbol"] == normalized),
+            None,
+        )
+
+    def get_orders(self, limit: int = 100) -> list[dict]:
+        orders = self._get(
+            "/v2/orders",
+            params={"status": "all", "limit": limit, "direction": "desc"},
+        )
+        if not isinstance(orders, list):
+            raise RuntimeError("Alpaca returned an invalid order-history response.")
+        return orders
+
     def place_order(
         self, symbol: str, qty: float, side: OrderSide, order_type: OrderType = "market",
         limit_price: float | None = None, stop_price: float | None = None,
@@ -110,21 +154,26 @@ class AlpacaAdapter(BrokerAdapter):
             raise ValueError("A symbol is required.")
         if qty <= 0:
             raise ValueError("Order quantity must be greater than zero.")
+        if order_type == "limit" and (limit_price is None or limit_price <= 0):
+            raise ValueError("A positive limit_price is required for limit orders.")
+        if order_type == "stop" and (stop_price is None or stop_price <= 0):
+            raise ValueError("A positive stop_price is required for stop orders.")
+        asset = self.get_tradable_asset(symbol)
+        if asset is None:
+            raise ValueError(f"{symbol.strip().upper()} is not an active, tradable Alpaca US equity.")
+        if not asset["fractionable"] and not float(qty).is_integer():
+            raise ValueError(f"{asset['symbol']} does not support fractional-share quantities.")
 
         body = {
-            "symbol": symbol.strip().upper(),
+            "symbol": asset["symbol"],
             "qty": str(qty),
             "side": side,
             "type": order_type,
             "time_in_force": "day",
         }
         if order_type == "limit":
-            if limit_price is None or limit_price <= 0:
-                raise ValueError("A positive limit_price is required for limit orders.")
             body["limit_price"] = str(limit_price)
         if order_type == "stop":
-            if stop_price is None or stop_price <= 0:
-                raise ValueError("A positive stop_price is required for stop orders.")
             body["stop_price"] = str(stop_price)
 
         data = self._post("/v2/orders", body)

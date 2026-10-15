@@ -1,9 +1,8 @@
 """
 End-to-end test of api_trading.py + the broker_registry-backed broker router
-in api_strategy.py. Uses a mock BrokerAdapter (no real Alpaca creds needed)
-to prove the "broker-backed order -> persisted trade -> closeable -> priced
-via quote" path works, then proves the synthetic fallback path works when no
-broker is connected.
+in api_strategy.py. Uses mock and local-paper adapters (no real Alpaca creds)
+to verify order persistence, close handling, live broker order history, and
+the default paper-account behavior.
 """
 
 import sys
@@ -21,6 +20,7 @@ from models_trade import define_trade_model
 from api_strategy import build_broker_router
 from api_trading import build_trading_router
 from spsg.broker.base import BrokerAdapter, BrokerAccount, BrokerPosition, BrokerOrder
+from spsg.broker.paper_adapter import PaperTradingAdapter
 
 DATABASE_URL = "sqlite:///:memory:"
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False}, poolclass=StaticPool)
@@ -116,6 +116,18 @@ class MockAdapter(BrokerAdapter):
     def get_latest_quote(self, symbol):
         return {"symbol": symbol, "bid": self._price - 0.1, "ask": self._price + 0.1, "price": self._price, "timestamp": None}
 
+    def get_orders(self, limit=100):
+        return [{
+            "id": "mock-order-1",
+            "symbol": "TSLA",
+            "side": "buy",
+            "type": "market",
+            "qty": "1",
+            "filled_avg_price": "100",
+            "status": "filled",
+            "submitted_at": "2026-10-15T12:00:00Z",
+        }][:limit]
+
 
 mock = MockAdapter()
 mock.connect("fake", "fake", paper=True)
@@ -172,7 +184,14 @@ print(live_trade)
 assert live_trade["mode"] == "live"
 assert live_trade["source"] == "broker"
 
-print("\n=== POST /trading/orders (paper, NO broker connected for a DIFFERENT user -> synthetic fallback) ===")
+print("\n=== GET /trading/orders?mode=live (broker-backed live orders are visible) ===")
+resp = client.get("/trading/orders", params={"mode": "live"})
+assert resp.status_code == 200, resp.text
+live_orders = resp.json()
+assert any(order["broker_order_id"] == "mock-order-1" for order in live_orders)
+assert any(order["symbol"] == "TSLA" and order["source"] == "broker" for order in live_orders)
+
+print("\n=== POST /trading/orders (new user receives local paper account) ===")
 db = SessionLocal()
 db.add(User(id=2, email="second@algosark.co.uk"))
 db.commit()
@@ -182,20 +201,31 @@ def get_current_user_2(db: Session = Depends(get_db)):
     return db.query(User).filter(User.id == 2).first()
 
 app.dependency_overrides[get_current_user] = get_current_user_2
-resp = client.post("/trading/orders", json={"symbol": "GBPUSD", "side": "buy", "qty": 1, "mode": "paper"})
+local_paper = PaperTradingAdapter()
+local_paper.connect("", "", paper=True)
+broker_registry.set_adapter(2, True, local_paper)
+assets_response = client.get("/trading/assets", params={"mode": "paper"})
+assert assets_response.status_code == 200, assets_response.text
+assert {asset["symbol"] for asset in assets_response.json()["assets"]} == {"AAPL", "TSLA"}
+unsupported = client.post(
+    "/trading/orders",
+    json={"symbol": "GBPUSD", "side": "buy", "qty": 1, "mode": "paper"},
+)
+assert unsupported.status_code == 400
+resp = client.post("/trading/orders", json={"symbol": "AAPL", "side": "buy", "qty": 1, "mode": "paper"})
 assert resp.status_code == 201, resp.text
-synth_trade = resp.json()
-print(synth_trade)
-assert synth_trade["source"] == "synthetic"
+local_trade = resp.json()
+print(local_trade)
+assert local_trade["source"] == "broker"
 app.dependency_overrides.pop(get_current_user, None)
 
-print("\n=== GET /trading/bars (synthetic fallback shape check for user 2) ===")
+print("\n=== GET /trading/bars (local paper account data for user 2) ===")
 app.dependency_overrides[get_current_user] = get_current_user_2
-resp = client.get("/trading/bars", params={"symbol": "GBPUSD", "timeframe": "5m", "mode": "paper", "limit": 20})
+resp = client.get("/trading/bars", params={"symbol": "AAPL", "timeframe": "5m", "mode": "paper", "limit": 20})
 assert resp.status_code == 200, resp.text
 bars_resp = resp.json()
 print("source:", bars_resp["source"], "num_bars:", len(bars_resp["bars"]))
-assert bars_resp["source"] == "synthetic"
+assert bars_resp["source"] == "broker"
 assert len(bars_resp["bars"]) == 20
 app.dependency_overrides.pop(get_current_user, None)
 
@@ -214,7 +244,8 @@ paper_account = resp.json()
 print(paper_account)
 assert paper_account["provider"] == "algosark-paper"
 assert paper_account["is_paper"] is True
-assert paper_account["cash"] == 10000.0
+expected_cash = 10000.0 - (local_trade["entry_price"] * local_trade["qty"])
+assert abs(paper_account["cash"] - expected_cash) < 1e-6
 
 print("\n=== POST /trading/orders (local paper adapter) ===")
 resp = client.post("/trading/orders", json={"symbol": "AAPL", "side": "buy", "qty": 2, "mode": "paper"})

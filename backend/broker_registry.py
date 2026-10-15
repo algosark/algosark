@@ -60,6 +60,13 @@ def get_adapter(user_id: int, mode: str) -> BrokerAdapter | None:
     return _adapters.get((user_id, mode))
 
 
+def is_shared_paper_adapter(user_id: int) -> bool:
+    return (
+        _shared_paper_adapter is not None
+        and get_adapter(user_id, "paper") is _shared_paper_adapter
+    )
+
+
 def ensure_paper_adapter(user_id: int) -> BrokerAdapter:
     adapter = get_adapter(user_id, "paper")
     if adapter is None:
