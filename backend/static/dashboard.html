@@ -465,6 +465,48 @@ canvas#equityChart {
 .field-row input:focus, .field-row select:focus { border-color: var(--gold); }
 .field-row select option { background: var(--bg2); }
 .field-row input::placeholder { color: var(--slate); font-size: .75rem; }
+.asset-picker { position: relative; width: 100%; min-width: 0; }
+.asset-picker.chart-asset-picker { flex: 0 1 260px; min-width: 210px; }
+.asset-picker-control { display: flex; width: 100%; }
+.asset-picker-control input {
+  min-width: 0; flex: 1; background: var(--bg2); border: 1px solid var(--border);
+  border-right: 0; border-radius: 7px 0 0 7px; color: var(--white);
+  font: .82rem var(--mono); padding: .5rem .7rem; outline: none;
+}
+.asset-picker-control input:focus { border-color: var(--gold); }
+.asset-picker-control button {
+  width: 38px; flex: none; border: 1px solid var(--border); border-radius: 0 7px 7px 0;
+  background: var(--bg2); color: var(--slate-l); cursor: pointer;
+}
+.asset-picker-control button:hover,
+.asset-picker.open .asset-picker-control button { color: var(--gold); border-color: var(--gold); }
+.asset-picker-options {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 120;
+  max-height: 300px; overflow-y: auto; background: var(--bg2);
+  border: 1px solid var(--border); border-radius: 7px;
+  box-shadow: 0 12px 28px rgba(0,0,0,.45);
+}
+.asset-picker-options[hidden] { display: none; }
+.asset-picker-option {
+  display: grid; grid-template-columns: minmax(58px, 76px) minmax(0, 1fr);
+  gap: .6rem; align-items: center; width: 100%; min-height: 39px; box-sizing: border-box;
+  padding: .5rem .7rem; border: 0; border-bottom: 1px solid rgba(255,255,255,.04);
+  background: transparent; color: var(--white); text-align: left; cursor: pointer;
+}
+.asset-picker-option:hover, .asset-picker-option:focus {
+  outline: none; background: var(--bg3);
+}
+.asset-picker-symbol {
+  overflow: hidden; color: var(--gold-l); font: 600 .75rem var(--mono);
+  text-overflow: ellipsis; white-space: nowrap;
+}
+.asset-picker-name {
+  min-width: 0; color: var(--slate-l); font-size: .72rem;
+  overflow-wrap: anywhere; white-space: normal;
+}
+.asset-picker-message {
+  padding: .7rem; color: var(--slate); font-size: .72rem;
+}
 
 .order-type-tabs {
   display: flex; background: var(--bg2);
@@ -510,13 +552,6 @@ canvas#equityChart {
   padding: .65rem 1rem;
   border-bottom: 1px solid var(--border);
   flex-wrap: wrap;
-}
-.chart-sym-picker {
-  background: var(--bg2); border: 1px solid var(--border);
-  border-radius: 6px; color: var(--white);
-  font-family: var(--mono); font-size: .82rem;
-  padding: .3rem .65rem; outline: none;
-  cursor: pointer;
 }
 .tf-btn {
   padding: .25rem .55rem; border-radius: 5px;
@@ -994,16 +1029,18 @@ canvas#priceChart { width:100% !important; height:100% !important; }
         <!-- Left: price chart -->
         <div class="price-chart-area">
           <div class="chart-toolbar">
-            <select class="chart-sym-picker" id="chartSymbol" onchange="changeSymbol()">
-              <option value="GBPUSD">GBP/USD</option>
-              <option value="EURUSD">EUR/USD</option>
-              <option value="USDJPY">USD/JPY</option>
-              <option value="BTCUSD">BTC/USD</option>
-              <option value="AAPL">AAPL</option>
-              <option value="TSLA">TSLA</option>
-              <option value="FTSE100">FTSE 100</option>
-              <option value="SPX">S&P 500</option>
-            </select>
+            <div class="asset-picker chart-asset-picker" id="chartAssetPicker">
+              <div class="asset-picker-control">
+                <input type="search" id="chartSymbol" value="AAPL" placeholder="Search symbol or company"
+                  autocomplete="off" role="combobox" aria-label="Search tradable assets for chart"
+                  aria-haspopup="listbox" aria-autocomplete="list" aria-expanded="false"
+                  aria-controls="chartAssetOptions" onfocus="openAssetPicker('chart')"
+                  oninput="searchTradableAssets('chart', this.value)"
+                  onkeydown="handleAssetPickerKeydown(event, 'chart')"/>
+                <button type="button" aria-label="Show tradable assets" onclick="toggleAssetPicker('chart')">⌄</button>
+              </div>
+              <div class="asset-picker-options" id="chartAssetOptions" role="listbox" hidden></div>
+            </div>
             <div style="display:flex;gap:3px;">
               <div class="tf-btn active" onclick="setTF(this,'1m')">1m</div>
               <div class="tf-btn" onclick="setTF(this,'5m')">5m</div>
@@ -1051,10 +1088,19 @@ canvas#priceChart { width:100% !important; height:100% !important; }
             </div>
             <div class="field-row">
               <label>Symbol</label>
-              <input type="text" id="orderSymbol" value="AAPL" list="tradableAssetSuggestions"
-                autocomplete="off" oninput="searchTradableAssets(this.value)" onchange="syncChartSymbol()"/>
-              <datalist id="tradableAssetSuggestions"></datalist>
-              <small class="muted" id="assetSearchStatus">Loading active, tradable US stocks…</small>
+              <div class="asset-picker" id="orderAssetPicker">
+                <div class="asset-picker-control">
+                  <input type="search" id="orderSymbol" value="AAPL" placeholder="Search symbol or company"
+                    autocomplete="off" role="combobox" aria-label="Search tradable assets for order"
+                    aria-haspopup="listbox" aria-autocomplete="list" aria-expanded="false"
+                    aria-controls="orderAssetOptions" onfocus="openAssetPicker('order')"
+                    oninput="searchTradableAssets('order', this.value)"
+                    onkeydown="handleAssetPickerKeydown(event, 'order')"/>
+                  <button type="button" aria-label="Show tradable assets" onclick="toggleAssetPicker('order')">⌄</button>
+                </div>
+                <div class="asset-picker-options" id="orderAssetOptions" role="listbox" hidden></div>
+              </div>
+              <small class="muted" id="assetSearchStatus">Search Alpaca's active, tradable US assets.</small>
             </div>
             <div class="field-row" id="priceFieldWrap" style="display:none">
               <label>Limit / Stop Price</label>
@@ -1728,13 +1774,15 @@ function formatPrice(p, sym) {
    STATE
 ══════════════════════════════════════════ */
 let mode = 'paper'; // 'paper' | 'live' — which broker connection every Trade-tab call uses
-let currentSym = 'GBPUSD';
+let currentSym = 'AAPL';
 let currentTF = '1d';
 let orderSide = 'buy';
 let orderType = 'market';
 let lastBarCloses = [];
-let assetSearchTimer;
-let assetSearchRequest = 0;
+const assetPickerState = {
+  chart: { timer: null, request: 0, open: false },
+  order: { timer: null, request: 0, open: false },
+};
 
 const SYNTHETIC_STARTING_BALANCE = 10000;
 let equityHistory = [SYNTHETIC_STARTING_BALANCE];
@@ -1912,62 +1960,184 @@ function setTF(el, tf) {
 }
 
 function changeSymbol() {
-  currentSym = document.getElementById('chartSymbol').value;
-  loadChart();
+  selectTradableAsset('chart', document.getElementById('chartSymbol').value);
 }
 function syncChartSymbol() {
-  const symbol = document.getElementById('orderSymbol').value.trim().toUpperCase();
-  document.getElementById('orderSymbol').value = symbol;
-  currentSym = symbol;
-  const chartSymbol = document.getElementById('chartSymbol');
-  if ([...chartSymbol.options].some(option => option.value === symbol)) {
-    chartSymbol.value = symbol;
+  selectTradableAsset('order', document.getElementById('orderSymbol').value);
+}
+
+function getAssetPickerElements(picker) {
+  return {
+    root: document.getElementById(`${picker}AssetPicker`),
+    input: document.getElementById(`${picker}Symbol`),
+    options: document.getElementById(`${picker}AssetOptions`),
+  };
+}
+
+function openAssetPicker(picker) {
+  const state = assetPickerState[picker];
+  if (!state || state.open) return;
+  closeAssetPicker(picker === 'chart' ? 'order' : 'chart');
+  state.open = true;
+  const { root, input, options } = getAssetPickerElements(picker);
+  root.classList.add('open');
+  options.hidden = false;
+  input.setAttribute('aria-expanded', 'true');
+  input.value = '';
+  loadTradableAssets(picker, '');
+}
+
+function toggleAssetPicker(picker) {
+  if (assetPickerState[picker]?.open) {
+    closeAssetPicker(picker);
+    return;
   }
+  const { input } = getAssetPickerElements(picker);
+  input.focus();
+  openAssetPicker(picker);
+}
+
+function closeAssetPicker(picker) {
+  const state = assetPickerState[picker];
+  if (!state) return;
+  state.open = false;
+  const { root, input, options } = getAssetPickerElements(picker);
+  root.classList.remove('open');
+  options.hidden = true;
+  options.replaceChildren();
+  input.setAttribute('aria-expanded', 'false');
+  input.value = currentSym;
+}
+
+function selectTradableAsset(picker, symbol) {
+  const normalized = symbol.trim().toUpperCase();
+  if (!normalized) {
+    closeAssetPicker(picker);
+    return;
+  }
+  currentSym = normalized;
+  document.getElementById('chartSymbol').value = normalized;
+  document.getElementById('orderSymbol').value = normalized;
+  closeAssetPicker('chart');
+  closeAssetPicker('order');
   loadChart();
 }
 
-async function loadTradableAssets(search = '') {
-  const requestId = ++assetSearchRequest;
+function renderAssetOptions(picker, assets, search) {
+  const { options } = getAssetPickerElements(picker);
+  options.replaceChildren();
+  if (!assets.length) {
+    const message = document.createElement('div');
+    message.className = 'asset-picker-message';
+    message.textContent = search
+      ? 'No matching active, tradable assets.'
+      : 'No active, tradable assets are available.';
+    options.append(message);
+    return;
+  }
+  assets.forEach(asset => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'asset-picker-option';
+    button.setAttribute('role', 'option');
+    button.setAttribute('aria-selected', String(asset.symbol === currentSym));
+    button.title = `${asset.symbol} — ${asset.name}`;
+    const symbol = document.createElement('span');
+    symbol.className = 'asset-picker-symbol';
+    symbol.textContent = asset.symbol;
+    const name = document.createElement('span');
+    name.className = 'asset-picker-name';
+    name.textContent = asset.name;
+    button.append(symbol, name);
+    button.addEventListener('mousedown', event => event.preventDefault());
+    button.addEventListener('keydown', event => handleAssetOptionKeydown(event, picker, button));
+    button.addEventListener('click', () => selectTradableAsset(picker, asset.symbol));
+    options.append(button);
+  });
+  if (assets.length === 50 && !search) {
+    const message = document.createElement('div');
+    message.className = 'asset-picker-message';
+    message.textContent = 'Showing 50 assets. Search by symbol or company to find others.';
+    options.append(message);
+  }
+}
+
+async function loadTradableAssets(picker, search = '') {
+  const state = assetPickerState[picker];
+  const { options } = getAssetPickerElements(picker);
+  const requestId = ++state.request;
   const status = document.getElementById('assetSearchStatus');
-  const symbolInput = document.getElementById('orderSymbol');
-  if (status) status.textContent = 'Loading active, tradable US stocks…';
+  if (picker === 'order' && status) {
+    status.textContent = 'Loading Alpaca active, tradable assets…';
+  }
+  if (state.open) {
+    const message = document.createElement('div');
+    message.className = 'asset-picker-message';
+    message.textContent = 'Searching tradable assets…';
+    options.replaceChildren(message);
+  }
   const { ok, data } = await apiFetch(
     `/trading/assets?mode=${mode}&search=${encodeURIComponent(search)}&limit=50`
   );
-  if (requestId !== assetSearchRequest) return;
-  const suggestions = document.getElementById('tradableAssetSuggestions');
+  if (requestId !== state.request) return;
   if (!ok || !data?.assets) {
-    if (status) status.textContent = data?.detail || 'Unable to load tradable assets. Retry by searching again.';
-    if (mode === 'live' && symbolInput) symbolInput.disabled = true;
-    suggestions.replaceChildren();
+    const message = document.createElement('div');
+    message.className = 'asset-picker-message';
+    message.textContent = data?.detail || 'Unable to load tradable assets. Please try again.';
+    if (state.open) options.replaceChildren(message);
+    if (picker === 'order' && status) status.textContent = message.textContent;
     return;
   }
-  if (symbolInput) symbolInput.disabled = false;
-  suggestions.replaceChildren(...data.assets.map(asset => {
-    const option = document.createElement('option');
-    option.value = asset.symbol;
-    option.label = asset.name && asset.name !== asset.symbol
-      ? `${asset.symbol} — ${asset.name}`
-      : asset.symbol;
-    return option;
-  }));
-  if (status) {
+  renderAssetOptions(picker, data.assets, search);
+  if (picker === 'order' && status) {
     status.textContent = data.assets.length
-      ? 'Choose a tradable Alpaca US stock. Orders are verified with Alpaca before submission.'
-      : 'No active, tradable Alpaca assets matched that search.';
+      ? 'Only active, tradable Alpaca assets can be selected.'
+      : search ? 'No matching active, tradable assets.' : 'No active, tradable assets are available.';
   }
 }
 
-function searchTradableAssets(search) {
-  clearTimeout(assetSearchTimer);
+function searchTradableAssets(picker, search) {
+  const state = assetPickerState[picker];
+  clearTimeout(state.timer);
+  if (!state.open) {
+    state.open = true;
+    const { root, options, input } = getAssetPickerElements(picker);
+    root.classList.add('open');
+    options.hidden = false;
+    input.setAttribute('aria-expanded', 'true');
+  }
   const query = search.trim();
   const status = document.getElementById('assetSearchStatus');
-  if (query.length < 1) {
-    if (status) status.textContent = 'Type a symbol or company name to search Alpaca tradable assets.';
-    document.getElementById('tradableAssetSuggestions').replaceChildren();
-    return;
+  if (picker === 'order' && status) status.textContent = 'Searching Alpaca active, tradable assets…';
+  state.timer = setTimeout(() => loadTradableAssets(picker, query), query ? 250 : 0);
+}
+
+function handleAssetPickerKeydown(event, picker) {
+  const { options } = getAssetPickerElements(picker);
+  if (event.key === 'ArrowDown') {
+    event.preventDefault();
+    options.querySelector('.asset-picker-option')?.focus();
+  } else if (event.key === 'Escape') {
+    closeAssetPicker(picker);
+  } else if (event.key === 'Enter' && assetPickerState[picker].open) {
+    const firstOption = options.querySelector('.asset-picker-option');
+    if (firstOption) {
+      event.preventDefault();
+      firstOption.click();
+    }
   }
-  assetSearchTimer = setTimeout(() => loadTradableAssets(query), 250);
+}
+
+function handleAssetOptionKeydown(event, picker, button) {
+  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    event.preventDefault();
+    const options = [...getAssetPickerElements(picker).options.querySelectorAll('.asset-picker-option')];
+    const current = options.indexOf(button);
+    options[(current + (event.key === 'ArrowDown' ? 1 : options.length - 1)) % options.length]?.focus();
+  } else if (event.key === 'Escape') {
+    closeAssetPicker(picker);
+    getAssetPickerElements(picker).input.focus();
+  }
 }
 
 /* ══════════════════════════════════════════
@@ -2014,7 +2184,8 @@ async function setMode(m) {
   loadChart();
   loadPositions();
   loadOrders();
-  loadTradableAssets('');
+  loadTradableAssets('chart', '');
+  loadTradableAssets('order', '');
   refreshAccountSummary();
 }
 
@@ -2880,7 +3051,10 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
 
   await refreshBrokerStatus();
-  await loadTradableAssets('');
+  await Promise.all([
+    loadTradableAssets('chart', ''),
+    loadTradableAssets('order', ''),
+  ]);
   const requestedView = new URLSearchParams(window.location.search).get('view');
   if (requestedView === 'strategy') showView('strategy');
   await loadBrokerProviders();
@@ -2889,6 +3063,10 @@ window.addEventListener('DOMContentLoaded', async () => {
       notificationsOpen = false;
       document.getElementById('notificationPanel')?.classList.remove('open');
       document.getElementById('notificationBell')?.setAttribute('aria-expanded', 'false');
+    }
+    if (!event.target.closest('.asset-picker')) {
+      closeAssetPicker('chart');
+      closeAssetPicker('order');
     }
   });
 

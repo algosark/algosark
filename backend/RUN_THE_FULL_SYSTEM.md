@@ -94,7 +94,8 @@ Visit `http://127.0.0.1:8000/index.html` (or `/login.html` to start).
 | Positions / History tabs | `GET /trading/positions`, `GET /trading/orders` | `api_trading.py` |
 | Dashboard notification bell | Recent strategy, paper-trade, and live-trade activity | `static/dashboard.html` |
 
-Order entry searches Alpaca's active, tradable US-equity catalog and validates
+The chart and order pickers search Alpaca's active, tradable US-equity catalog
+and show matching symbols with their full asset names. Order entry validates
 the selected asset and fractional-share eligibility again before submission.
 For a personal Alpaca connection, recent broker orders are merged into the
 order list in the selected mode. The shared paper account's broker-wide history
