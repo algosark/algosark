@@ -20,14 +20,16 @@ Wire-up in main.py (add near the bottom, after `Base.metadata.create_all`):
 
 from __future__ import annotations
 import logging
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from account_notifications import notify_admin_strategy_request
+from auth_tokens import decode_action_token, create_action_token, hash_action_token
 import broker_registry
-from auth_tokens import decode_action_token
-from models import User
+from models import AuthToken, User
 from spsg import SPSGEngine
 from spsg.broker import AlpacaAdapter
 
@@ -130,6 +132,12 @@ def build_strategy_router(get_db, get_current_user, SurveyResponse, Strategy) ->
             .first()
         )
         if existing:
+            db.query(AuthToken).filter(
+                AuthToken.user_id == user_id,
+                AuthToken.purpose == "strategy_request",
+                AuthToken.used_at.is_(None),
+            ).update({"used_at": datetime.utcnow()})
+            db.commit()
             return {"user_id": user_id, "strategy": existing.payload, "already_generated": True}
 
         try:
@@ -143,6 +151,11 @@ def build_strategy_router(get_db, get_current_user, SurveyResponse, Strategy) ->
                 is_active=1,
             )
             db.add(strategy)
+            db.query(AuthToken).filter(
+                AuthToken.user_id == user_id,
+                AuthToken.purpose == "strategy_request",
+                AuthToken.used_at.is_(None),
+            ).update({"used_at": datetime.utcnow()})
             db.commit()
         except Exception as exc:
             db.rollback()
@@ -152,6 +165,75 @@ def build_strategy_router(get_db, get_current_user, SurveyResponse, Strategy) ->
                 detail="Strategy generation failed. The server logged the underlying error; contact support if retrying does not work.",
             ) from exc
         return {"user_id": user_id, "strategy": result, "already_generated": False}
+
+    @router.post("/request", status_code=status.HTTP_202_ACCEPTED)
+    def request_strategy(
+        db: Session = Depends(get_db),
+        current_user=Depends(get_current_user),
+    ):
+        survey = (
+            db.query(SurveyResponse)
+            .filter(SurveyResponse.user_id == current_user.id)
+            .order_by(SurveyResponse.id.desc())
+            .first()
+        )
+        if not survey:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Complete the eligibility & risk survey before requesting a strategy.",
+            )
+
+        strategy = (
+            db.query(Strategy)
+            .filter(Strategy.user_id == current_user.id, Strategy.is_active == 1)
+            .order_by(Strategy.id.desc())
+            .first()
+        )
+        if strategy:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A strategy has already been generated for your account.",
+            )
+
+        pending_request = db.query(AuthToken).filter(
+            AuthToken.user_id == current_user.id,
+            AuthToken.purpose == "strategy_request",
+            AuthToken.used_at.is_(None),
+            AuthToken.expires_at > datetime.utcnow(),
+        ).first()
+        if pending_request:
+            return {
+                "status": "pending",
+                "requested_at": pending_request.expires_at - timedelta(days=30),
+                "already_requested": True,
+            }
+
+        admin_token = create_action_token(
+            current_user.id, "admin_generate_strategy", timedelta(days=30)
+        )
+        try:
+            notify_admin_strategy_request(current_user, admin_token)
+        except Exception as exc:
+            logger.exception("Strategy request notification failed for user_id=%s", current_user.id)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Your survey is saved, but we could not notify the strategy team. Please try again.",
+            ) from exc
+
+        request_record = AuthToken(
+            user_id=current_user.id,
+            token_hash=hash_action_token(admin_token),
+            purpose="strategy_request",
+            expires_at=datetime.utcnow() + timedelta(days=30),
+        )
+        db.add(request_record)
+        db.commit()
+        db.refresh(request_record)
+        return {
+            "status": "pending",
+            "requested_at": request_record.expires_at - timedelta(days=30),
+            "already_requested": False,
+        }
 
     @router.get("/me")
     def get_my_strategy(
@@ -165,6 +247,18 @@ def build_strategy_router(get_db, get_current_user, SurveyResponse, Strategy) ->
             .first()
         )
         if not strategy:
+            pending_request = db.query(AuthToken).filter(
+                AuthToken.user_id == current_user.id,
+                AuthToken.purpose == "strategy_request",
+                AuthToken.used_at.is_(None),
+                AuthToken.expires_at > datetime.utcnow(),
+            ).first()
+            if pending_request:
+                requested_at = pending_request.expires_at - timedelta(days=30)
+                return {
+                    "status": "pending",
+                    "target_ready_by": (requested_at + timedelta(hours=48)).isoformat(),
+                }
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="No strategy generated yet. POST /strategy/generate first.",

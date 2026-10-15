@@ -2405,8 +2405,11 @@ async function requestStrategy() {
     loadStrategy();
   } else if (httpStatus === 400) {
     showToast('error', 'Survey required', data?.detail || 'Complete the eligibility & risk survey first.');
+  } else if (httpStatus === 409) {
+    showToast('error', 'Strategy already exists', data?.detail || 'A strategy has already been generated for your account.');
+    loadStrategy();
   } else {
-    showToast('error', 'Request failed', 'Something went wrong requesting your strategy. Please try again.');
+    showToast('error', 'Request failed', data?.detail || 'Something went wrong requesting your strategy. Please try again.');
   }
 }
 

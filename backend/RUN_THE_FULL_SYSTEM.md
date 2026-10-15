@@ -81,7 +81,7 @@ Visit `http://127.0.0.1:8000/index.html` (or `/login.html` to start).
 | Register / Login / verification / reset | `POST /api/register`, `POST /api/login`, `/api/verify-email`, `/api/password/*` | `main.py`, `social_login.py` |
 | Profile view/edit | `GET /users/me`, `PATCH /users/me` | `main.py`, `api_profile.py` |
 | Eligibility survey | `POST /api/survey` | `main.py`, `schema.py` |
-| My Strategy tab | `POST /strategy/generate`, `GET /strategy/me`, `GET /strategy/history` | `api_strategy.py`, `spsg/` |
+| My Strategy tab | `POST /strategy/request`, `POST /strategy/admin-generate`, `GET /strategy/me`, `GET /strategy/history` | `api_strategy.py`, `account_notifications.py`, `spsg/` |
 | Settings → Broker Connection | `POST /broker/connect`, `GET /broker/status`, `GET /broker/account` | `api_strategy.py`, `broker_registry.py` |
 | Trade tab — chart + timeframes | `GET /trading/bars`, `GET /trading/quote` | `api_trading.py` |
 | Trade tab — place/close orders | `POST /trading/orders`, `POST /trading/orders/{id}/close` | `api_trading.py` |

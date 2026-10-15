@@ -23,6 +23,21 @@ def notify_admin_new_account(user) -> None:
     )
 
 
+def notify_admin_strategy_request(user, token: str) -> None:
+    admin_email = os.getenv("ADMIN_EMAIL", "oluwadaretomiwa@gmail.com")
+    link = (
+        f"{os.getenv('FRONTEND_URL', 'http://localhost:8000')}"
+        f"/admin-generate-strategy.html?token={token}"
+    )
+    send_email(
+        admin_email,
+        f"Strategy requested: {user.email}",
+        f"The user has completed their survey and requested a personalized strategy.\n\n"
+        f"Name: {user.first_name} {user.last_name}\nEmail: {user.email}\nUser ID: {user.id}\n\n"
+        f"Generate the strategy:\n{link}\n",
+    )
+
+
 def send_welcome_email(user) -> None:
     send_email(
         user.email,
