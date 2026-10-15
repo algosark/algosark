@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Confirm email — Algosark</title>
+  <style>
+    body{font:16px system-ui,sans-serif;background:#f3f5f9;color:#0d1b3e;display:grid;place-items:center;min-height:100vh;margin:0}
+    main{background:white;padding:2rem;border-radius:16px;max-width:440px;width:calc(100% - 3rem);box-shadow:0 12px 40px #0d1b3e18}
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Confirm your email</h1>
+    <p id="message" role="status">Verifying your email address…</p>
+    <a id="loginLink" href="/login.html">Continue to sign in</a>
+  </main>
+  <script>
+    const token = new URLSearchParams(location.hash.slice(1)).get('token');
+    history.replaceState(null, '', location.pathname + location.search);
+    const message = document.getElementById('message');
+    const loginLink = document.getElementById('loginLink');
+    (async () => {
+      try {
+        if (!token) throw new Error('The confirmation link is missing its token.');
+        const response = await fetch('/api/verify-email', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({token}),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.detail || 'Email verification failed.');
+        message.textContent = 'Email confirmed. You can now sign in and complete your risk survey.';
+        loginLink.href = '/login.html?verified=1&next=survey';
+      } catch (error) {
+        message.textContent = error.message || 'Email verification failed.';
+      }
+    })();
+  </script>
+</body>
+</html>

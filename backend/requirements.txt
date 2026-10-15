@@ -6,6 +6,7 @@ bcrypt>=4.1
 python-jose[cryptography]>=3.3
 pydantic[email]>=2.6
 python-multipart>=0.0.9
+python-dotenv>=1.0
 
 # SPSG engine + broker integration
 numpy>=1.26

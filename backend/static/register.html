@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -711,11 +712,11 @@
         <!-- Success overlay (shown after submit) -->
         <div class="success-overlay" id="successOverlay">
           <div class="success-icon"><i class="fas fa-check"></i></div>
-          <h2 class="display-font" style="font-size:1.8rem;color:var(--navy);margin-bottom:.6rem;">Account created!</h2>
-          <p style="color:var(--slate-dark);font-size:.9rem;line-height:1.6;max-width:300px;margin-bottom:1.5rem;">
-            Welcome to Algosark. We'll take you to the risk survey now so we can build your strategy.
+          <h2 class="display-font" style="font-size:1.8rem;color:var(--navy);margin-bottom:.6rem;">Check your inbox</h2>
+          <p id="registrationSuccessMessage" style="color:var(--slate-dark);font-size:.9rem;line-height:1.6;max-width:300px;margin-bottom:1.5rem;">
+            We sent you an email confirmation link. Verify your email before signing in.
           </p>
-          <div style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;color:var(--slate-dark);">
+          <div id="registrationRedirecting" style="display:none;align-items:center;gap:.4rem;font-size:.82rem;color:var(--slate-dark);">
             <div style="width:14px;height:14px;border:2px solid var(--slate-mid);border-top-color:var(--gold);border-radius:50%;animation:spin .6s linear infinite;"></div>
             Redirecting to your survey…
           </div>
@@ -747,7 +748,7 @@
 
           <!-- Social sign-up -->
           <div class="social-row">
-            <a href="#" class="social-sign-btn">
+            <button type="button" class="social-sign-btn" id="registerGoogleBtn">
               <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
                 <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
@@ -755,7 +756,8 @@
                 <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
               </svg>
               Continue with Google
-            </a>
+            </button>
+            <a href="/auth/github/login" class="social-sign-btn" id="registerGithubBtn">Continue with GitHub</a>
           </div>
 
           <div class="divider">or register with email</div>
@@ -1043,55 +1045,10 @@ form.addEventListener('submit', async (e) => {
             throw new Error(message);
         }
 
-        // Automatically log in the registered user
-        let token = data.access_token;
-        let user = data.user;
-
-        // If registration does not return a token, log in separately
-        if (!token) {
-            const loginResponse = await fetch(
-                `${window.location.origin}/api/login`,
-                {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        email: email,
-                        password: password
-                    })
-                }
-            );
-
-            const loginData = await loginResponse.json().catch(() => ({}));
-
-            if (!loginResponse.ok || !loginData.access_token) {
-                throw new Error(
-                    'Account created successfully, but automatic login failed. Please log in manually.'
-                );
-            }
-
-            token = loginData.access_token;
-            user = loginData.user || user;
-        }
-
-        // Save authentication session
-        localStorage.setItem('access_token', token);
-
-        if (user) {
-            localStorage.setItem('user', JSON.stringify(user));
-        }
-
-        // Display registration success
+        // Registration requires email confirmation before password sign-in.
         document.getElementById('formWrap').style.display = 'none';
         document.getElementById('successOverlay').classList.add('show');
-
-        // Redirect authenticated user to survey
-        setTimeout(() => {
-            window.location.replace(
-                `${window.location.origin}/survey.html?referral_page=register`
-            );
-        }, 2500);
+        return;
 
     } catch (err) {
         console.error('Registration/Login error:', err);
@@ -1123,6 +1080,79 @@ form.addEventListener('submit', async (e) => {
       }
     });
   });
+
+  let googleRegisterClient = null;
+  const googleRegisterButton = document.getElementById('registerGoogleBtn');
+  function waitForRegisterGoogleLibrary() {
+    if (window.google?.accounts?.oauth2) return Promise.resolve();
+    const script = document.querySelector('script[src*="accounts.google.com/gsi/client"]');
+    if (!script) return Promise.resolve();
+    return new Promise(resolve => {
+      const done = () => { clearTimeout(timeout); resolve(); };
+      const timeout = setTimeout(done, 5000);
+      script.addEventListener('load', done, { once: true });
+      script.addEventListener('error', done, { once: true });
+    });
+  }
+
+  async function initializeRegisterProviders() {
+    const response = await fetch('/auth/config');
+    if (!response.ok) throw new Error('Could not load sign-in configuration.');
+    const config = await response.json();
+    const githubButton = document.getElementById('registerGithubBtn');
+    githubButton.href = config.github_enabled ? config.github_login_url : '#';
+    if (!config.github_enabled) {
+      githubButton.addEventListener('click', event => {
+        event.preventDefault();
+        alert('GitHub sign-in is not configured.');
+      });
+    }
+    if (!config.google_enabled) {
+      googleRegisterButton.disabled = true;
+      return;
+    }
+    await waitForRegisterGoogleLibrary();
+
+    const startClient = () => {
+      if (!window.google?.accounts?.oauth2) return false;
+      googleRegisterClient = google.accounts.oauth2.initCodeClient({
+        client_id: config.google_client_id,
+        scope: 'openid email profile',
+        ux_mode: 'popup',
+        callback: async result => {
+          if (result.error) return;
+          googleRegisterButton.disabled = true;
+          try {
+            const authResponse = await fetch('/auth/google/callback', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ code: result.code }),
+            });
+            const authData = await authResponse.json();
+            if (!authResponse.ok) throw new Error(authData.detail || 'Google sign-in failed.');
+            localStorage.setItem('access_token', authData.access_token);
+            localStorage.setItem('user', JSON.stringify(authData.user));
+            if (authData.notification_warning) {
+              alert('Your account is ready, but a welcome/admin email could not be sent. Please contact support.');
+            }
+            window.location.replace(authData.is_new ? '/survey.html?referral_page=register' : '/dashboard.html');
+          } catch (error) {
+            alert(error.message || 'Google sign-in failed.');
+            googleRegisterButton.disabled = false;
+          }
+        },
+      });
+      return true;
+    };
+
+    if (!startClient()) googleRegisterButton.disabled = true;
+  }
+
+  initializeRegisterProviders().catch(error => {
+    console.error('Could not initialize registration providers:', error);
+    googleRegisterButton.disabled = true;
+  });
+  googleRegisterButton.addEventListener('click', () => googleRegisterClient?.requestCode());
 </script>
 </body>
 </html>

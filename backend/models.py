@@ -20,6 +20,7 @@ class User(Base):
     google_id = Column(String, unique=True, nullable=True)
     github_id = Column(String, unique=True, nullable=True)
     provider = Column(String, nullable=True)
+    email_verified = Column(Boolean, nullable=False, default=False)
     survey_response = relationship("SurveyResponse", back_populates="user", uselist=False)
     created_at = Column(String(50), default=lambda: datetime.utcnow().isoformat())
     updated_at = Column(
@@ -27,3 +28,14 @@ class User(Base):
         default=lambda: datetime.utcnow().isoformat(),
         onupdate=lambda: datetime.utcnow().isoformat(),
     )
+
+
+class AuthToken(Base):
+    __tablename__ = "auth_tokens"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    token_hash = Column(String(64), unique=True, nullable=False, index=True)
+    purpose = Column(String(40), nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    used_at = Column(DateTime, nullable=True)

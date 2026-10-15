@@ -1347,7 +1347,11 @@ canvas#priceChart { width:100% !important; height:100% !important; }
             <span class="pill pill-paper" id="brokerStatusPill">Not Connected</span>
           </div>
           <div class="card-body" id="brokerDisconnected" style="display:flex;flex-direction:column;gap:.85rem">
-            <div class="small text-slate">Connect an Alpaca account to enable live/paper order execution from the Trade tab.</div>
+            <div class="small text-slate">All users share the Alpaca paper account configured in the server environment, including its orders and positions. You can connect a personal Alpaca account instead.</div>
+            <div class="field-row">
+              <label for="broker-provider">Broker provider</label>
+              <select id="broker-provider"></select>
+            </div>
             <div class="field-row">
               <label>Alpaca API Key</label>
               <input type="text" id="broker-api-key" placeholder="API key"/>
@@ -1381,7 +1385,7 @@ canvas#priceChart { width:100% !important; height:100% !important; }
                 <div class="settings-row-sub" id="brokerPortfolioValue">—</div>
               </div>
             </div>
-            <button class="btn-outline" style="align-self:flex-start" onclick="disconnectBroker()">Disconnect</button>
+            <button class="btn-outline" style="align-self:flex-start" onclick="disconnectBroker()" id="brokerDisconnectBtn">Disconnect</button>
           </div>
         </div>
 
@@ -2451,10 +2455,12 @@ async function refreshBrokerStatus() {
   const { ok, data } = await apiFetch('/broker/account');
   const pill = document.getElementById('brokerStatusPill');
   if (ok && data) {
-    pill.textContent = 'Connected';
+    const localPaper = data.provider === 'algosark-paper';
+    pill.textContent = localPaper ? 'Paper Ready' : 'Connected';
     pill.className = 'pill pill-open';
-    document.getElementById('brokerDisconnected').style.display = 'none';
+    document.getElementById('brokerDisconnected').style.display = localPaper ? 'flex' : 'none';
     document.getElementById('brokerConnected').style.display = 'flex';
+    document.getElementById('brokerDisconnectBtn').style.display = localPaper ? 'none' : 'inline-flex';
     setEl('brokerCash', fmtMoney(parseFloat(data.cash || 0)));
     setEl('brokerPortfolioValue', fmtMoney(parseFloat(data.portfolio_value || 0)));
   } else {
@@ -2465,7 +2471,26 @@ async function refreshBrokerStatus() {
   }
 }
 
+async function loadBrokerProviders() {
+  const { ok, data } = await apiFetch('/broker/providers');
+  if (!ok || !Array.isArray(data?.providers)) {
+    showToast('error', 'Broker list unavailable', data?.detail || 'Could not load supported brokers.');
+    return;
+  }
+  const select = document.getElementById('broker-provider');
+  select.replaceChildren(...data.providers.map(provider => {
+    const option = document.createElement('option');
+    option.value = provider.id;
+    option.textContent = provider.connectable
+      ? provider.name
+      : `${provider.name} (connection unavailable)`;
+    option.disabled = !provider.connectable;
+    return option;
+  }));
+}
+
 async function connectBroker() {
+  const provider = document.getElementById('broker-provider').value;
   const api_key = document.getElementById('broker-api-key').value.trim();
   const api_secret = document.getElementById('broker-api-secret').value.trim();
   const paper = document.getElementById('broker-paper-toggle').checked;
@@ -2480,7 +2505,7 @@ async function connectBroker() {
 
   const { ok, data } = await apiFetch('/broker/connect', {
     method: 'POST',
-    body: JSON.stringify({ provider: 'alpaca', api_key, api_secret, paper }),
+    body: JSON.stringify({ provider, api_key, api_secret, paper }),
   });
 
   btn.disabled = false; btn.textContent = 'Connect Broker';
@@ -2556,8 +2581,27 @@ function fmtMoney(v) {
 /* ══════════════════════════════════════════
    BOOT
 ══════════════════════════════════════════ */
-window.addEventListener('DOMContentLoaded', () => {
-  if (!requireAuth()) return; // redirects to /login.html if no token; stop here either way
+window.addEventListener('DOMContentLoaded', async () => {
+  const oauthParams = new URLSearchParams(window.location.hash.slice(1));
+  const oauthToken = oauthParams.get('access_token');
+  const oauthNext = oauthParams.get('next');
+  const notificationWarning = oauthParams.get('notification_warning') === 'true';
+  if (oauthToken) {
+    localStorage.setItem('access_token', oauthToken);
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    if (oauthNext === 'survey') {
+      window.location.replace('/survey.html?referral_page=register');
+      return;
+    }
+  }
+  if (!requireAuth()) return; // Redirect if not logged in
+
+  if (notificationWarning) {
+    showToast('error', 'Email notification issue', 'Your account is ready, but a welcome/admin email could not be sent.');
+  }
+
+  await refreshBrokerStatus();
+  await loadBrokerProviders();
 
   // Instant paint from cache, then reconcile with the server.
   loadProfileFromStorage();

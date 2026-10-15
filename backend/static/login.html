@@ -638,7 +638,7 @@
             </svg>
             <span id="googleBtnText">Google</span>
           </button>
-          <a href="http://localhost:8000/auth/github/login" class="social-sign-btn" id="githubBtn">
+          <a href="/auth/github/login" class="social-sign-btn" id="githubBtn">
             <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="var(--ink)">
               <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
             </svg>
@@ -676,7 +676,7 @@
             <label class="checkbox-label">
               <input type="checkbox" id="remember" /> Remember me for 30 days
             </label>
-            <a href="#" class="forgot-link">Forgot password?</a>
+            <a href="forgot-password.html" class="forgot-link">Forgot password?</a>
           </div>
 
           <button type="submit" class="btn-submit" id="loginBtn">
@@ -684,6 +684,9 @@
             <div class="spinner"></div>
           </button>
         </form>
+        <p style="text-align:center;margin-top:.75rem;font-size:.82rem;">
+          <a href="#" id="resendVerificationLink">Resend email confirmation</a>
+        </p>
 
         <div class="auth-alt">
           New to Algosark? <a href="register.html">Create a free account</a>
@@ -711,26 +714,49 @@
   // ─── Config: change these to your real deployed URLs ───
   // ─── const backendUrl = 'https://algosark.co.uk/'; 
 
-  const GOOGLE_CLIENT_ID = '125437989737-5scubm78bn3p2ogh2bdaq36v30qson9t.apps.googleusercontent.com';
-
-  // The GitHub button is a plain link (href set above) — clicking it does a
-  // full-page redirect straight to the backend, which handles the rest.
-  // Nothing to wire up in JS for GitHub.
-
-  // ─── Google sign-in (popup code flow) ───
   let googleCodeClient = null;
   const googleBtn = document.getElementById('googleBtn');
   const googleBtnText = document.getElementById('googleBtnText');
+  const githubBtn = document.getElementById('githubBtn');
+  let authConfig = null;
 
-  function initGoogleClient() {
+  function waitForGoogleLibrary() {
+    if (window.google?.accounts?.oauth2) return Promise.resolve();
+    const script = document.querySelector('script[src*="accounts.google.com/gsi/client"]');
+    if (!script) return Promise.resolve();
+    return new Promise(resolve => {
+      const done = () => { clearTimeout(timeout); resolve(); };
+      const timeout = setTimeout(done, 5000);
+      script.addEventListener('load', done, { once: true });
+      script.addEventListener('error', done, { once: true });
+    });
+  }
+
+  async function initAuthProviders() {
+    const configResponse = await fetch('/auth/config');
+    if (!configResponse.ok) throw new Error('Could not load sign-in configuration.');
+    authConfig = await configResponse.json();
+    githubBtn.href = authConfig.github_enabled ? authConfig.github_login_url : '#';
+    if (!authConfig.github_enabled) {
+      githubBtn.setAttribute('aria-disabled', 'true');
+      githubBtn.addEventListener('click', event => {
+        event.preventDefault();
+        alert('GitHub sign-in is not configured.');
+      });
+    }
+    if (!authConfig.google_enabled) {
+      googleBtn.disabled = true;
+      googleBtnText.textContent = 'Google (unavailable)';
+      return;
+    }
+    await waitForGoogleLibrary();
     if (!window.google || !google.accounts || !google.accounts.oauth2) {
-      // GIS script hasn't loaded yet (slow network, blocked script, etc.)
       googleBtn.disabled = true;
       googleBtnText.textContent = 'Google (unavailable)';
       return;
     }
     googleCodeClient = google.accounts.oauth2.initCodeClient({
-      client_id: GOOGLE_CLIENT_ID,
+      client_id: authConfig.google_client_id,
       scope: 'openid email profile',
       ux_mode: 'popup',
       callback: handleGoogleCodeResponse,
@@ -755,12 +781,18 @@
         body: JSON.stringify({ code: response.code }),
       });
 
-      if (!res.ok) throw new Error(`Backend rejected the code (${res.status})`);
-
-      window.location.href = 'dashboard.html';
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Google sign-in failed.');
+      localStorage.setItem('access_token', data.access_token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      if (data.notification_warning) {
+        alert('You are signed in, but a welcome/admin email could not be sent. Please contact support.');
+      }
+      const nextPage = data.is_new ? 'survey.html?referral_page=register' : 'dashboard.html';
+      window.location.replace(nextPage);
     } catch (err) {
       console.error(err);
-      alert('Google sign-in failed. Please try again.');
+      alert(err.message || 'Google sign-in failed. Please try again.');
       googleBtn.disabled = false;
       googleBtnText.textContent = 'Google';
     }
@@ -774,7 +806,24 @@
     }
   });
 
-  window.addEventListener('load', initGoogleClient);
+  window.addEventListener('load', () => {
+    initAuthProviders().catch(err => {
+      console.error('Could not initialize sign-in providers:', err);
+      googleBtn.disabled = true;
+      googleBtnText.textContent = 'Google (unavailable)';
+    });
+  }, { once: true });
+
+  const oauthParams = new URLSearchParams(window.location.hash.slice(1));
+  const githubToken = oauthParams.get('access_token');
+  if (githubToken) {
+    localStorage.setItem('access_token', githubToken);
+    history.replaceState(null, '', window.location.pathname);
+    const nextPage = oauthParams.get('next') === 'survey'
+      ? 'survey.html?referral_page=register'
+      : 'dashboard.html';
+    window.location.replace(nextPage);
+  }
 
   // ─── Existing password login (unchanged) ───
   const pwToggle = document.getElementById('pwToggle');
@@ -789,6 +838,10 @@
   const form      = document.getElementById('loginForm');
   const loginBtn  = document.getElementById('loginBtn');
   const toast     = document.getElementById('successToast');
+  if (new URLSearchParams(window.location.search).get('verified') === '1') {
+    toast.textContent = 'Email confirmed. Sign in to continue to your risk survey.';
+    toast.classList.add('show');
+  }
 
   function validate() {
     let ok = true;
@@ -830,9 +883,10 @@
             email: document.getElementById('email').value,
             password: document.getElementById('password').value
         })
-    }).then(res => {
-      if (!res.ok) throw new Error('Network response was not ok');
-      return res.json();
+    }).then(async res => {
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Login failed.');
+      return data;
     }).then(data => {
       console.log(data);
       loginBtn.classList.remove('loading');
@@ -841,15 +895,38 @@
 
       localStorage.setItem('access_token', data.access_token);
 
-      setTimeout(() => {
-        window.location.href = 'dashboard.html';
-      }, 1800);
+      const nextPage = new URLSearchParams(window.location.search).get('next') === 'survey'
+        ? 'survey.html?referral_page=register'
+        : 'dashboard.html';
+      setTimeout(() => window.location.replace(nextPage), 700);
     }).catch(err => {
       console.error(err);
       loginBtn.classList.remove('loading');
       loginBtn.disabled = false;
-      alert('Login failed. Please check your credentials and try again.');
+      alert(err.message || 'Login failed. Please check your credentials and try again.');
     });
+
+  });
+
+  document.getElementById('resendVerificationLink')?.addEventListener('click', async event => {
+    event.preventDefault();
+    const email = document.getElementById('email').value.trim();
+    if (!email) {
+      alert('Enter your email address first.');
+      return;
+    }
+    try {
+      const response = await fetch('/api/verification/resend', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({email}),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || 'Unable to send confirmation email.');
+      alert(data.message);
+    } catch (error) {
+      alert(error.message || 'Unable to send confirmation email.');
+    }
   });
 
   ['email','password'].forEach(id => {

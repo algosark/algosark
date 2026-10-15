@@ -21,21 +21,51 @@ request rather than caching the connection itself.
 """
 
 from __future__ import annotations
+import os
+from spsg.broker import BrokerAdapter
 from spsg.broker import AlpacaAdapter
+from spsg.broker.paper_adapter import PaperTradingAdapter
 
-_adapters: dict[tuple[int, str], AlpacaAdapter] = {}
+_adapters: dict[tuple[int, str], BrokerAdapter] = {}
+_shared_paper_adapter: BrokerAdapter | None = None
+
+
+def _get_shared_paper_adapter() -> BrokerAdapter:
+    global _shared_paper_adapter
+    if _shared_paper_adapter is None:
+        api_key = os.getenv("ALPACA_KEY") or os.getenv("ALPACA_API_KEY")
+        api_secret = os.getenv("ALPACA_SECRET") or os.getenv("ALPACA_API_SECRET")
+        if api_key and api_secret:
+            if os.getenv("ALPACA_PAPER", "true").lower() != "true":
+                raise RuntimeError("The shared Algosark Alpaca account must be configured for paper trading.")
+            adapter = AlpacaAdapter()
+            adapter.connect(api_key, api_secret, paper=True)
+            _shared_paper_adapter = adapter
+        else:
+            adapter = PaperTradingAdapter()
+            adapter.connect("", "", paper=True)
+            _shared_paper_adapter = adapter
+    return _shared_paper_adapter
 
 
 def mode_key(paper: bool) -> str:
     return "paper" if paper else "live"
 
 
-def set_adapter(user_id: int, paper: bool, adapter: AlpacaAdapter) -> None:
+def set_adapter(user_id: int, paper: bool, adapter: BrokerAdapter) -> None:
     _adapters[(user_id, mode_key(paper))] = adapter
 
 
-def get_adapter(user_id: int, mode: str) -> AlpacaAdapter | None:
+def get_adapter(user_id: int, mode: str) -> BrokerAdapter | None:
     return _adapters.get((user_id, mode))
+
+
+def ensure_paper_adapter(user_id: int) -> BrokerAdapter:
+    adapter = get_adapter(user_id, "paper")
+    if adapter is None:
+        adapter = _get_shared_paper_adapter()
+        set_adapter(user_id, True, adapter)
+    return adapter
 
 
 def clear_adapter(user_id: int, mode: str) -> None:

@@ -18,6 +18,7 @@ from sqlalchemy.pool import StaticPool
 
 import broker_registry
 from models_trade import define_trade_model
+from api_strategy import build_broker_router
 from api_trading import build_trading_router
 from spsg.broker.base import BrokerAdapter, BrokerAccount, BrokerPosition, BrokerOrder
 
@@ -55,13 +56,29 @@ def get_current_user(db: Session = Depends(get_db)):
 
 
 app.include_router(build_trading_router(get_db, get_current_user, Trade))
+app.include_router(build_broker_router(get_db, get_current_user))
 
 client = TestClient(app)
+
+provider_response = client.get("/broker/providers")
+assert provider_response.status_code == 200
+providers = provider_response.json()["providers"]
+assert {provider["id"] for provider in providers} == {
+    "alpaca", "interactive_brokers", "ig", "saxo", "binance",
+}
+assert next(provider for provider in providers if provider["id"] == "alpaca")["connectable"] is True
+assert all(provider["connectable"] is False for provider in providers if provider["id"] != "alpaca")
 
 db = SessionLocal()
 db.add(User(id=1, email="tomiwa@algosark.co.uk"))
 db.commit()
 db.close()
+
+unlisted_provider = client.post(
+    "/broker/connect",
+    json={"provider": "unsupported", "api_key": "fake", "api_secret": "fake"},
+)
+assert unlisted_provider.status_code == 400
 
 
 # ----------------------------------------------------------------------------
@@ -188,5 +205,25 @@ assert resp.status_code == 200, resp.text
 bars_resp = resp.json()
 print("source:", bars_resp["source"], "num_bars:", len(bars_resp["bars"]))
 assert bars_resp["source"] == "broker"
+
+print("\n=== GET /broker/account (unconnected user is auto-connected to local paper) ===")
+app.dependency_overrides[get_current_user] = get_current_user_2
+resp = client.get("/broker/account")
+assert resp.status_code == 200, resp.text
+paper_account = resp.json()
+print(paper_account)
+assert paper_account["provider"] == "algosark-paper"
+assert paper_account["is_paper"] is True
+assert paper_account["cash"] == 10000.0
+
+print("\n=== POST /trading/orders (local paper adapter) ===")
+resp = client.post("/trading/orders", json={"symbol": "AAPL", "side": "buy", "qty": 2, "mode": "paper"})
+assert resp.status_code == 201, resp.text
+paper_trade = resp.json()
+assert paper_trade["source"] == "broker"
+positions = client.get("/broker/positions").json()
+assert len(positions) == 1
+assert positions[0]["symbol"] == "AAPL"
+app.dependency_overrides.pop(get_current_user, None)
 
 print("\nALL TRADING INTEGRATION CHECKS PASSED")

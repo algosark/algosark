@@ -19,14 +19,26 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from starlette.middleware.sessions import SessionMiddleware
 from social_login import router as social_router
-from models import User
+from models import AuthToken, User
 from database import engine, SessionLocal, Base
+import broker_registry
+from account_notifications import notify_admin_new_account
+from auth_tokens import (
+    create_access_token,
+    create_action_token,
+    decode_action_token,
+    hash_action_token,
+)
+from email_service import is_configured, send_email
+from sqlalchemy import inspect, text
+import logging
 
 
 # ====================== DATABASE SETUP ======================
-SECRET_KEY = "your-super-secret-key-change-this"
+SECRET_KEY = os.environ.get("SECRET_KEY") or os.environ["SESSION_SECRET"]
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
+logger = logging.getLogger(__name__)
 
 # ====================== FASTAPI APP ======================
 app = FastAPI(title="Algosark API")
@@ -80,13 +92,33 @@ def serve_pricing_page():
 def serve_register_page():
     return FileResponse("static/register.html")
 
+@app.get("/forgot-password.html")
+def serve_forgot_password_page():
+    return FileResponse("static/forgot-password.html")
 
-def create_access_token(data: dict, expires_delta: timedelta = None):
-    to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+@app.get("/reset-password.html")
+def serve_reset_password_page():
+    return FileResponse("static/reset-password.html")
+
+@app.get("/verify-email.html")
+def serve_verify_email_page():
+    return FileResponse("static/verify-email.html")
+
+@app.get("/admin-generate-strategy.html")
+def serve_admin_generate_strategy_page():
+    return FileResponse("static/admin-generate-strategy.html")
+
+
+def ensure_auth_schema():
+    if "email_verified" not in {column["name"] for column in inspect(engine).get_columns("users")}:
+        with engine.begin() as connection:
+            connection.execute(text(
+                "ALTER TABLE users ADD COLUMN email_verified BOOLEAN NOT NULL DEFAULT 0"
+            ))
+
+
+Base.metadata.create_all(bind=engine)
+ensure_auth_schema()
 
 
 class SurveyResponse(Base):
@@ -190,6 +222,7 @@ class UserResponse(BaseModel):
     email: EmailStr
     trading_experience: Optional[str] = None
     created_at: str
+    email_verified: bool = False
 
 
 # Helper functions
@@ -206,12 +239,32 @@ def get_user_by_email(db: Session, email: str):
     return db.query(User).filter(User.email == email).first()
 
 
+def create_stored_action_token(db: Session, user_id: int, purpose: str, expiry: timedelta) -> str:
+    token = create_action_token(user_id, purpose, expiry)
+    db.add(AuthToken(
+        user_id=user_id,
+        token_hash=hash_action_token(token),
+        purpose=purpose,
+        expires_at=datetime.utcnow() + expiry,
+    ))
+    db.commit()
+    return token
+
+
+def send_verification_email(db: Session, user: User) -> None:
+    token = create_stored_action_token(db, user.id, "verify_email", timedelta(days=2))
+    link = f"{os.getenv('FRONTEND_URL', 'http://localhost:8000')}/verify-email.html#token={token}"
+    send_email(user.email, "Confirm your Algosark email", f"Confirm your email address:\n\n{link}\n")
+
+
 # ====================== AUTH ENDPOINTS ======================
 @app.post("/api/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def register(user: UserRegister, db: Session = Depends(get_db)):
     existing_user = get_user_by_email(db, user.email)
     if existing_user:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
+    if not is_configured():
+        raise HTTPException(status_code=503, detail="Email delivery is not configured; account creation is unavailable.")
 
     hashed_password = get_password_hash(user.password)
 
@@ -221,12 +274,24 @@ def register(user: UserRegister, db: Session = Depends(get_db)):
         email=user.email,
         password_hash=hashed_password,
         trading_experience=user.trading_experience,
+        marketing_opt_in=user.marketingOptIn,
+        email_verified=False,
     )
 
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
 
+    broker_registry.ensure_paper_adapter(db_user.id)
+    try:
+        send_verification_email(db, db_user)
+        notify_admin_new_account(db_user)
+    except Exception as exc:
+        logger.exception("Email notification failed for new account %s", db_user.id)
+        raise HTTPException(
+            status_code=503,
+            detail="Account created, but email delivery failed. Use the resend-verification option or contact support.",
+        ) from exc
     return db_user
 
 
@@ -234,10 +299,14 @@ def register(user: UserRegister, db: Session = Depends(get_db)):
 def login(user: UserLogin, db: Session = Depends(get_db)):
     db_user = get_user_by_email(db, user.email)
 
-    if not db_user or not verify_password(user.password, db_user.password_hash):
+    if not db_user or not db_user.password_hash or not verify_password(user.password, db_user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect email or password")
 
-    access_token = create_access_token(data={"sub": db_user.email})
+    if not db_user.email_verified:
+        raise HTTPException(status_code=403, detail="Confirm your email address before signing in.")
+
+    access_token = create_access_token(db_user.email)
+    broker_registry.ensure_paper_adapter(db_user.id)
 
     return {
         "message": "Login successful",
@@ -251,6 +320,101 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
             "trading_experience": db_user.trading_experience,
         },
     }
+
+
+class EmailPayload(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetPayload(BaseModel):
+    token: str
+    password: str
+
+
+@app.post("/api/verification/resend")
+def resend_verification(payload: EmailPayload, db: Session = Depends(get_db)):
+    if not is_configured():
+        raise HTTPException(status_code=503, detail="Email delivery is not configured.")
+    user = get_user_by_email(db, payload.email)
+    if user and not user.email_verified:
+        send_verification_email(db, user)
+    return {"message": "If the account needs verification, a confirmation email has been sent."}
+
+
+class VerifyEmailPayload(BaseModel):
+    token: str
+
+
+@app.post("/api/verify-email")
+def verify_email(payload: VerifyEmailPayload, db: Session = Depends(get_db)):
+    token_hash = hash_action_token(payload.token)
+    record = db.query(AuthToken).filter(
+        AuthToken.token_hash == token_hash,
+        AuthToken.purpose == "verify_email",
+        AuthToken.used_at.is_(None),
+        AuthToken.expires_at > datetime.utcnow(),
+    ).first()
+    if not record:
+        raise HTTPException(status_code=400, detail="This verification link is invalid or has expired.")
+    record.used_at = datetime.utcnow()
+    user = db.query(User).filter(User.id == record.user_id).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="The account for this link no longer exists.")
+    user.email_verified = True
+    db.commit()
+    return {"verified": True}
+
+
+@app.post("/api/password/forgot")
+def forgot_password(payload: EmailPayload, db: Session = Depends(get_db)):
+    from email_service import is_configured
+    if not is_configured():
+        raise HTTPException(status_code=503, detail="Email delivery is not configured.")
+    user = get_user_by_email(db, payload.email)
+    if user and user.password_hash:
+        token = create_stored_action_token(db, user.id, "reset_password", timedelta(hours=1))
+        link = f"{os.getenv('FRONTEND_URL', 'http://localhost:8000')}/reset-password.html#token={token}"
+        send_email(user.email, "Reset your Algosark password", f"Reset your password using this link:\n\n{link}\n")
+    return {"message": "If an account exists for that email, a password reset link has been sent."}
+
+
+@app.post("/api/password/reset")
+def reset_password(payload: PasswordResetPayload, db: Session = Depends(get_db)):
+    if len(payload.password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters.")
+    token_hash = hash_action_token(payload.token)
+    record = db.query(AuthToken).filter(
+        AuthToken.token_hash == token_hash,
+        AuthToken.purpose == "reset_password",
+        AuthToken.used_at.is_(None),
+        AuthToken.expires_at > datetime.utcnow(),
+    ).first()
+    if not record:
+        raise HTTPException(status_code=400, detail="This password reset link is invalid or has expired.")
+    user = db.query(User).filter(User.id == record.user_id).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="The account for this link no longer exists.")
+    user.password_hash = get_password_hash(payload.password)
+    record.used_at = datetime.utcnow()
+    db.query(AuthToken).filter(
+        AuthToken.user_id == user.id,
+        AuthToken.purpose == "reset_password",
+        AuthToken.used_at.is_(None),
+    ).update({"used_at": datetime.utcnow()})
+    db.commit()
+    try:
+        send_email(
+            user.email,
+            "Your Algosark password was changed",
+            "Your Algosark password has been reset. If you did not make this change, contact support immediately.\n",
+        )
+    except Exception as exc:
+        logger.exception("Password reset confirmation email failed for user %s", user.id)
+        raise HTTPException(
+            status_code=503,
+            detail="Your password was changed, but the confirmation email could not be sent.",
+        ) from exc
+    return {"message": "Password reset successfully. You can now sign in."}
 
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
@@ -272,6 +436,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     if user is None:
         raise credentials_exception
 
+    broker_registry.ensure_paper_adapter(user.id)
     return user
 
 

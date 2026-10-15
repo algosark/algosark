@@ -24,6 +24,8 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 import broker_registry
+from auth_tokens import decode_action_token
+from models import User
 from spsg import SPSGEngine
 from spsg.broker import AlpacaAdapter
 
@@ -43,6 +45,10 @@ def get_spsg_engine() -> SPSGEngine:
 
 def _survey_row_to_dict(survey_row) -> dict:
     return {c.name: getattr(survey_row, c.name) for c in survey_row.__table__.columns}
+
+
+class AdminGenerateRequest(BaseModel):
+    token: str
 
 
 def build_strategy_router(get_db, get_current_user, SurveyResponse, Strategy) -> APIRouter:
@@ -87,6 +93,54 @@ def build_strategy_router(get_db, get_current_user, SurveyResponse, Strategy) ->
         db.refresh(db_strategy)
 
         return result
+
+    @router.post("/admin-generate")
+    def admin_generate_strategy(
+        body: AdminGenerateRequest,
+        db: Session = Depends(get_db),
+    ):
+        try:
+            user_id = decode_action_token(body.token, "admin_generate_strategy")
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found.")
+
+        survey = (
+            db.query(SurveyResponse)
+            .filter(SurveyResponse.user_id == user_id)
+            .order_by(SurveyResponse.id.desc())
+            .first()
+        )
+        if not survey:
+            raise HTTPException(
+                status_code=409,
+                detail="The user must submit the eligibility and risk survey before a strategy can be generated.",
+            )
+
+        existing = (
+            db.query(Strategy)
+            .filter(Strategy.user_id == user_id, Strategy.is_active == 1)
+            .order_by(Strategy.id.desc())
+            .first()
+        )
+        if existing:
+            return {"user_id": user_id, "strategy": existing.payload, "already_generated": True}
+
+        result = get_spsg_engine().generate_strategy(_survey_row_to_dict(survey))
+        strategy = Strategy(
+            user_id=user_id,
+            strategy_name=result["strategy_name"],
+            risk_profile_score=result["risk_profile_score"],
+            detected_regime=result["regime_detection"]["detected_regime"],
+            payload=result,
+            is_active=1,
+        )
+        db.add(strategy)
+        db.commit()
+        return {"user_id": user_id, "strategy": result, "already_generated": False}
 
     @router.get("/me")
     def get_my_strategy(
@@ -175,6 +229,15 @@ class BrokerConnectRequest(BaseModel):
     paper: bool = True
 
 
+BROKER_PROVIDERS = [
+    {"id": "alpaca", "name": "Alpaca", "connectable": True},
+    {"id": "interactive_brokers", "name": "Interactive Brokers", "connectable": False},
+    {"id": "ig", "name": "IG", "connectable": False},
+    {"id": "saxo", "name": "Saxo", "connectable": False},
+    {"id": "binance", "name": "Binance", "connectable": False},
+]
+
+
 class OrderRequest(BaseModel):
     symbol: str
     qty: float
@@ -188,13 +251,23 @@ class OrderRequest(BaseModel):
 def build_broker_router(get_db, get_current_user) -> APIRouter:
     router = APIRouter(prefix="/broker", tags=["broker"])
 
+    @router.get("/providers")
+    def broker_providers():
+        return {"providers": BROKER_PROVIDERS}
+
     @router.post("/connect")
     def connect_broker(
         body: BrokerConnectRequest,
         current_user=Depends(get_current_user),
     ):
-        if body.provider != "alpaca":
-            raise HTTPException(status_code=400, detail=f"Provider '{body.provider}' not yet supported")
+        provider = next((item for item in BROKER_PROVIDERS if item["id"] == body.provider), None)
+        if not provider:
+            raise HTTPException(status_code=400, detail=f"Provider '{body.provider}' is not allowed.")
+        if not provider["connectable"]:
+            raise HTTPException(
+                status_code=501,
+                detail=f"{provider['name']} is allow-listed but its API adapter is not implemented yet.",
+            )
         adapter = AlpacaAdapter()
         adapter.connect(body.api_key, body.api_secret, paper=body.paper)
         try:
@@ -210,17 +283,22 @@ def build_broker_router(get_db, get_current_user) -> APIRouter:
     @router.get("/status")
     def broker_status(current_user=Depends(get_current_user)):
         """Which modes (paper/live) currently have a connected broker."""
+        broker_registry.ensure_paper_adapter(current_user.id)
         return {"connected_modes": broker_registry.connected_modes(current_user.id)}
 
     @router.get("/account")
     def get_account(mode: str = "paper", current_user=Depends(get_current_user)):
+        if mode == "paper":
+            broker_registry.ensure_paper_adapter(current_user.id)
         adapter = broker_registry.get_adapter(current_user.id, mode)
         if not adapter:
             raise HTTPException(status_code=400, detail=f"No {mode} broker connected. POST /broker/connect first.")
-        return adapter.get_account().__dict__
+        return {**adapter.get_account().__dict__, "provider": adapter.provider_name}
 
     @router.get("/positions")
     def get_positions(mode: str = "paper", current_user=Depends(get_current_user)):
+        if mode == "paper":
+            broker_registry.ensure_paper_adapter(current_user.id)
         adapter = broker_registry.get_adapter(current_user.id, mode)
         if not adapter:
             raise HTTPException(status_code=400, detail=f"No {mode} broker connected. POST /broker/connect first.")
@@ -228,6 +306,8 @@ def build_broker_router(get_db, get_current_user) -> APIRouter:
 
     @router.post("/order")
     def place_order(body: OrderRequest, mode: str = "paper", current_user=Depends(get_current_user)):
+        if mode == "paper":
+            broker_registry.ensure_paper_adapter(current_user.id)
         adapter = broker_registry.get_adapter(current_user.id, mode)
         if not adapter:
             raise HTTPException(status_code=400, detail=f"No {mode} broker connected. POST /broker/connect first.")
