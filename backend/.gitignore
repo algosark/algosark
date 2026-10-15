@@ -2,3 +2,6 @@
 ../.venv
 .venv
 venv
+users.db
+__pycache__
+spsg/broker/__pycache__
