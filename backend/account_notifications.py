@@ -9,7 +9,9 @@ from email_service import send_email
 
 def notify_admin_new_account(user) -> None:
     admin_email = os.getenv("ADMIN_EMAIL", "oluwadaretomiwa@gmail.com")
-    token = create_action_token(user.id, "admin_generate_strategy", timedelta(days=30))
+    token = create_action_token(
+        user.id, "admin_generate_strategy", timedelta(days=30), email=user.email
+    )
     link = (
         f"{os.getenv('FRONTEND_URL', 'http://localhost:8000')}"
         f"/admin-generate-strategy.html?token={token}"

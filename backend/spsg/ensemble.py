@@ -36,6 +36,7 @@ labels — the architecture doesn't change, only the training set does.
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
+from importlib.metadata import PackageNotFoundError, version
 import json
 import warnings
 import numpy as np
@@ -59,6 +60,17 @@ TARGETS = [
     "max_positions",
     "holding_period_days",
 ]
+
+
+def _model_package_versions() -> dict[str, str]:
+    versions = {}
+    for package in ("xgboost", "lightgbm", "scikit-learn"):
+        try:
+            versions[package] = version(package)
+        except PackageNotFoundError:
+            versions[package] = "not-installed"
+    return versions
+
 
 # Regime -> meta-learner blend weights over the 3 base learners (xgb, lgbm, nn).
 # Crisis regimes lean on the smoothest/most-regularised learner (nn) and shrink
@@ -200,13 +212,28 @@ class SPSGEnsemble:
         joblib.dump(self.scaler, path / "scaler.joblib")
         for target, base_models in self.models.items():
             joblib.dump(base_models, path / f"models_{target}.joblib")
-        (path / "meta.json").write_text(json.dumps({"targets": TARGETS, "regimes": REGIMES}))
+        (path / "meta.json").write_text(json.dumps({
+            "targets": TARGETS,
+            "regimes": REGIMES,
+            "package_versions": _model_package_versions(),
+        }))
 
     @classmethod
     def load(cls, path: str | Path) -> "SPSGEnsemble":
         path = Path(path)
+        meta_path = path / "meta.json"
+        if meta_path.exists():
+            metadata = json.loads(meta_path.read_text())
+            cached_versions = metadata.get("package_versions")
+            if cached_versions and cached_versions != _model_package_versions():
+                raise ValueError(
+                    "Cached ensemble package versions do not match the installed "
+                    f"versions: cache={cached_versions}, runtime={_model_package_versions()}"
+                )
         scaler = joblib.load(path / "scaler.joblib")
         models = {}
         for target in TARGETS:
             models[target] = joblib.load(path / f"models_{target}.joblib")
-        return cls(scaler=scaler, models=models)
+        ensemble = cls(scaler=scaler, models=models)
+        ensemble.predict(np.zeros(EMBEDDING_LENGTH, dtype=np.float64))
+        return ensemble

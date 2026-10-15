@@ -15,6 +15,7 @@ Strategy" page (view-strategy in dashboard.html) expects to render.
 
 from __future__ import annotations
 from pathlib import Path
+import logging
 import numpy as np
 
 from .features import build_investor_profile
@@ -23,6 +24,7 @@ from .ensemble import SPSGEnsemble
 from .backtester import load_price_history, walk_forward_backtest, detect_drift
 
 MODEL_DIR = Path(__file__).resolve().parent.parent / "models_cache"
+logger = logging.getLogger(__name__)
 
 MARKET_LABELS = {
     "forex": "Forex",
@@ -74,9 +76,13 @@ class SPSGEngine:
         ensemble_path = self.model_dir / "ensemble"
         try:
             self.ensemble = SPSGEnsemble.load(ensemble_path)
-        except FileNotFoundError:
+        except Exception:
             if not auto_train:
                 raise
+            logger.exception(
+                "Cached SPSG ensemble is missing or incompatible; retraining it at %s",
+                ensemble_path,
+            )
             self.ensemble = SPSGEnsemble.train(n_samples=4000)
             self.ensemble.save(ensemble_path)
 

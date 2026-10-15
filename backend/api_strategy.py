@@ -28,7 +28,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from account_notifications import notify_admin_strategy_request
-from auth_tokens import decode_action_token, create_action_token, hash_action_token
+from auth_tokens import decode_action_token_claims, create_action_token, hash_action_token
 import broker_registry
 from models import AuthToken, User
 from spsg import SPSGEngine
@@ -106,13 +106,24 @@ def build_strategy_router(get_db, get_current_user, SurveyResponse, Strategy) ->
         db: Session = Depends(get_db),
     ):
         try:
-            user_id = decode_action_token(body.token, "admin_generate_strategy")
+            user_id, user_email = decode_action_token_claims(
+                body.token, "admin_generate_strategy"
+            )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
         user = db.query(User).filter(User.id == user_id).first()
+        if user is None and user_email:
+            user = db.query(User).filter(User.email == user_email).first()
         if not user:
-            raise HTTPException(status_code=404, detail="User not found.")
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    "The user identified by this admin link is not in the active database. "
+                    "Request a fresh strategy link after the backend changes are deployed."
+                ),
+            )
+        user_id = user.id
 
         survey = (
             db.query(SurveyResponse)
@@ -219,14 +230,37 @@ def build_strategy_router(get_db, get_current_user, SurveyResponse, Strategy) ->
             AuthToken.expires_at > datetime.utcnow(),
         ).first()
         if pending_request:
+            admin_token = create_action_token(
+                current_user.id,
+                "admin_generate_strategy",
+                timedelta(days=30),
+                email=current_user.email,
+            )
+            try:
+                notify_admin_strategy_request(current_user, admin_token)
+            except Exception as exc:
+                logger.exception(
+                    "Strategy request notification retry failed for user_id=%s",
+                    current_user.id,
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Your strategy request is pending, but we could not resend the admin link. Please try again.",
+                ) from exc
+            pending_request.token_hash = hash_action_token(admin_token)
+            pending_request.expires_at = datetime.utcnow() + timedelta(days=30)
+            db.commit()
             return {
                 "status": "pending",
-                "requested_at": pending_request.expires_at - timedelta(days=30),
+                "requested_at": datetime.utcnow(),
                 "already_requested": True,
             }
 
         admin_token = create_action_token(
-            current_user.id, "admin_generate_strategy", timedelta(days=30)
+            current_user.id,
+            "admin_generate_strategy",
+            timedelta(days=30),
+            email=current_user.email,
         )
         try:
             notify_admin_strategy_request(current_user, admin_token)

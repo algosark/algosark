@@ -50,7 +50,12 @@ python scripts/train_models.py
 
 Without this, the first request to `/strategy/generate` after a fresh start
 trains the ensemble on the fly (~20-30s). With it, startup is instant. Either
-way, models are cached to `models_cache/`.
+way, models are cached to `models_cache/`. The cached ensemble records its
+XGBoost, LightGBM, and scikit-learn versions and is smoke-tested when loaded;
+an incompatible cache is logged and retrained automatically. After deploying
+dependency updates, install `requirements.txt` and run this training command
+once as part of the deployment to avoid triggering a cold retrain at runtime.
+XGBoost 1.7.6 requires NumPy below 2.
 
 ## 4. Put your frontend files in `static/`
 
