@@ -72,7 +72,7 @@
         }
         message.textContent = `Strategy generated for user ${data.user_id}: ${data.strategy.strategy_name}`;
       } catch (error) {
-        message.textContent = error.message || 'Strategy generation failed.';
+        message.textContent = error.message || 'Strategy generation failed.' + error;
         if (error.details) {
           diagnosticDetails.textContent = error.details;
           diagnostic.style.display = 'block';
