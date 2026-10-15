@@ -143,54 +143,72 @@ async def github_callback(
 ):
     if error:
         return RedirectResponse(f"{FRONTEND_URL}/login.html?error=github_denied")
-    expected_state = request.session.pop("oauth_state", None)
-    if not state or state != expected_state:
-        raise HTTPException(400, "Invalid or missing OAuth state")
-    if not code:
-        raise HTTPException(400, "GitHub did not return an authorization code.")
+    phase = "state validation"
+    try:
+        expected_state = request.session.pop("oauth_state", None)
+        if not state or state != expected_state:
+            raise HTTPException(400, "Invalid or missing OAuth state")
+        if not code:
+            raise HTTPException(400, "GitHub did not return an authorization code.")
+        if not GITHUB_CLIENT_ID or not GITHUB_CLIENT_SECRET:
+            raise HTTPException(503, "GitHub sign-in is not configured.")
 
-    async with httpx.AsyncClient(timeout=15) as client:
-        token_response = await client.post(
-            "https://github.com/login/oauth/access_token",
-            headers={"Accept": "application/json"},
-            data={
-                "client_id": GITHUB_CLIENT_ID,
-                "client_secret": GITHUB_CLIENT_SECRET,
-                "code": code,
-                "redirect_uri": GITHUB_REDIRECT_URI,
-            },
+        phase = "GitHub code exchange"
+        async with httpx.AsyncClient(timeout=15) as client:
+            token_response = await client.post(
+                "https://github.com/login/oauth/access_token",
+                headers={"Accept": "application/json"},
+                data={
+                    "client_id": GITHUB_CLIENT_ID,
+                    "client_secret": GITHUB_CLIENT_SECRET,
+                    "code": code,
+                    "redirect_uri": GITHUB_REDIRECT_URI,
+                },
+            )
+            token_response.raise_for_status()
+            access_token = token_response.json().get("access_token")
+            if not access_token:
+                logger.error("GitHub token exchange returned no access token")
+                raise HTTPException(400, "GitHub token exchange failed; restart sign-in and try again.")
+
+            headers = {"Authorization": f"Bearer {access_token}", "Accept": "application/json"}
+            phase = "GitHub profile lookup"
+            user_response = await client.get("https://api.github.com/user", headers=headers)
+            user_response.raise_for_status()
+            provider_user = user_response.json()
+
+            phase = "GitHub verified-email lookup"
+            email_response = await client.get("https://api.github.com/user/emails", headers=headers)
+            email_response.raise_for_status()
+            emails = email_response.json()
+            primary = next(
+                (item for item in emails if item.get("primary") and item.get("verified")),
+                None,
+            )
+            email = primary["email"] if primary else None
+
+        phase = "account persistence"
+        account, is_new, notification_warning = create_or_get_user(
+            db,
+            "github",
+            str(provider_user["id"]),
+            email,
+            provider_user.get("name") or provider_user.get("login"),
         )
-        token_response.raise_for_status()
-        access_token = token_response.json().get("access_token")
-        if not access_token:
-            raise HTTPException(400, "GitHub token exchange failed.")
-
-        headers = {"Authorization": f"Bearer {access_token}", "Accept": "application/json"}
-        user_response = await client.get("https://api.github.com/user", headers=headers)
-        user_response.raise_for_status()
-        provider_user = user_response.json()
-        email_response = await client.get("https://api.github.com/user/emails", headers=headers)
-        email_response.raise_for_status()
-        emails = email_response.json()
-        primary = next(
-            (item for item in emails if item.get("primary") and item.get("verified")),
-            None,
+        token = create_access_token(account.email, timedelta(days=30))
+        next_page = "survey" if is_new else "dashboard"
+        warning = "&notification_warning=true" if notification_warning else ""
+        return RedirectResponse(
+            f"{FRONTEND_URL}/dashboard.html#access_token={token}&next={next_page}{warning}"
         )
-        email = primary["email"] if primary else None
-
-    account, is_new, notification_warning = create_or_get_user(
-        db,
-        "github",
-        str(provider_user["id"]),
-        email,
-        provider_user.get("name") or provider_user.get("login"),
-    )
-    token = create_access_token(account.email, timedelta(days=30))
-    next_page = "survey" if is_new else "dashboard"
-    warning = "&notification_warning=true" if notification_warning else ""
-    return RedirectResponse(
-        f"{FRONTEND_URL}/dashboard.html#access_token={token}&next={next_page}{warning}"
-    )
+    except HTTPException:
+        raise
+    except Exception:
+        db.rollback()
+        logger.exception("GitHub OAuth callback failed during %s", phase)
+        return RedirectResponse(
+            f"{FRONTEND_URL}/login.html?error=github_callback_failed"
+        )
 
 
 class GoogleCodePayload(BaseModel):

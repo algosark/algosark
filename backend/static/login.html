@@ -842,6 +842,14 @@
     toast.textContent = 'Email confirmed. Sign in to continue to your risk survey.';
     toast.classList.add('show');
   }
+  const authError = new URLSearchParams(window.location.search).get('error');
+  if (authError === 'github_callback_failed') {
+    toast.textContent = 'GitHub sign-in could not be completed. Please start again or sign in with email.';
+    toast.classList.add('show');
+  } else if (authError === 'github_denied') {
+    toast.textContent = 'GitHub sign-in was cancelled. You can try again or sign in with email.';
+    toast.classList.add('show');
+  }
 
   function validate() {
     let ok = true;
