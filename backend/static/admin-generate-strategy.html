@@ -70,7 +70,8 @@
         if (!data.strategy?.strategy_name) {
           throw new Error('The server response did not include a generated strategy name.');
         }
-        message.textContent = `Strategy generated for user ${data.user_id}: ${data.strategy.strategy_name}`;
+        const outcome = data.already_generated ? 'Strategy already existed' : 'Strategy generated';
+        message.textContent = `${outcome} for ${data.user_email}: ${data.strategy.strategy_name}`;
       } catch (error) {
         message.textContent = error.message || 'Strategy generation failed.';
         if (error.details) {

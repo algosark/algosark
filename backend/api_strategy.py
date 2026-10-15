@@ -150,7 +150,11 @@ def build_strategy_router(get_db, get_current_user, SurveyResponse, Strategy) ->
                 AuthToken.used_at.is_(None),
             ).update({"used_at": datetime.utcnow()})
             db.commit()
-            return {"user_id": user_id, "strategy": existing.payload, "already_generated": True}
+            return {
+                "user_email": user.email,
+                "strategy": existing.payload,
+                "already_generated": True,
+            }
 
         phase = "engine initialization"
         try:
@@ -192,7 +196,11 @@ def build_strategy_router(get_db, get_current_user, SurveyResponse, Strategy) ->
                     "detail": f"{phase}: {error_type}: {error_message}",
                 },
             )
-        return {"user_id": user_id, "strategy": result, "already_generated": False}
+        return {
+            "user_email": user.email,
+            "strategy": result,
+            "already_generated": False,
+        }
 
     @router.post("/request", status_code=status.HTTP_202_ACCEPTED)
     def request_strategy(

@@ -2387,6 +2387,10 @@ async function loadStrategy() {
     setEl('strategyRejectReason', data.reason || 'Please review and update your survey answers.');
   } else if (data.status === 'ready' && data.strategy) {
     renderStrategy(data.strategy);
+  } else if (data.strategy_name) {
+    // The API returns the stored strategy payload directly once an admin
+    // generates it; pending requests use a status wrapper instead.
+    renderStrategy(data);
   } else {
     setStrategyPanelState('empty');
   }
