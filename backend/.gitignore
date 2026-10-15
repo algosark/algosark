@@ -31,3 +31,4 @@ htmlcov/
 .vscode/
 .idea/
 .DS_Store
+users.db-journal

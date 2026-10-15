@@ -9,6 +9,9 @@
     main{background:white;padding:2rem;border-radius:16px;max-width:560px;width:calc(100% - 3rem);box-shadow:0 12px 40px #0d1b3e18}
     button{font:inherit;padding:.8rem 1.2rem;background:#c9972a;color:white;border:0;border-radius:8px;cursor:pointer}
     #message{white-space:pre-wrap}
+    #diagnostic{display:none;margin-top:1rem;padding:1rem;border:1px solid #ef9a9a;border-radius:8px;background:#fff4f4;color:#7f1d1d}
+    #diagnostic h2{font-size:1rem;margin:0 0 .5rem}
+    #diagnostic pre{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.5 ui-monospace,monospace}
   </style>
 </head>
 <body>
@@ -17,6 +20,10 @@
     <p>Use this time-limited admin link to generate a strategy for the account in the notification email. The user must have submitted the risk survey first.</p>
     <button id="generateButton">Generate strategy</button>
     <p id="message" role="status"></p>
+    <section id="diagnostic" role="alert" aria-live="assertive">
+      <h2>Generation error details</h2>
+      <pre id="diagnosticDetails"></pre>
+    </section>
   </main>
   <script>
     const hashParams = new URLSearchParams(location.hash.slice(1));
@@ -26,6 +33,10 @@
     document.getElementById('generateButton').addEventListener('click', async event => {
       const button = event.currentTarget;
       const message = document.getElementById('message');
+      const diagnostic = document.getElementById('diagnostic');
+      const diagnosticDetails = document.getElementById('diagnosticDetails');
+      diagnostic.style.display = 'none';
+      diagnosticDetails.textContent = '';
       if (!token) {
         message.textContent = 'This admin link is missing its token. Open the latest strategy notification email and use its link.';
         return;
@@ -42,15 +53,19 @@
         try {
           data = responseText ? JSON.parse(responseText) : {};
         } catch {
-          const statusMessage = response.status
-            ? `Server returned HTTP ${response.status}.`
-            : 'The server returned an unreadable response.';
-          throw new Error(response.status >= 500
-            ? `The server failed while generating the strategy (${statusMessage}) Check the backend logs or contact support.`
-            : statusMessage);
+          const statusMessage = `HTTP ${response.status || 'unknown'}\n${responseText || 'The server returned an empty response.'}`;
+          throw new Error(statusMessage);
         }
         if (!response.ok) {
-          throw new Error(data.detail || `Strategy generation failed (HTTP ${response.status}).`);
+          const details = [
+            `HTTP ${response.status}`,
+            data.phase && `Phase: ${data.phase}`,
+            data.exception && `Exception: ${data.exception}`,
+            data.message || data.detail,
+          ].filter(Boolean).join('\n');
+          const error = new Error(data.detail || `Strategy generation failed (HTTP ${response.status}).`);
+          error.details = details;
+          throw error;
         }
         if (!data.strategy?.strategy_name) {
           throw new Error('The server response did not include a generated strategy name.');
@@ -58,6 +73,10 @@
         message.textContent = `Strategy generated for user ${data.user_id}: ${data.strategy.strategy_name}`;
       } catch (error) {
         message.textContent = error.message || 'Strategy generation failed.';
+        if (error.details) {
+          diagnosticDetails.textContent = error.details;
+          diagnostic.style.display = 'block';
+        }
         button.disabled = false;
       }
     });

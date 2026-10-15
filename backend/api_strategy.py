@@ -23,6 +23,7 @@ import logging
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -168,13 +169,18 @@ def build_strategy_router(get_db, get_current_user, SurveyResponse, Strategy) ->
                 phase,
                 user_id,
             )
-            raise HTTPException(
+            error_type = type(exc).__name__
+            error_message = str(exc) or repr(exc)
+            return JSONResponse(
                 status_code=500,
-                detail=(
-                    f"Strategy generation failed during {phase} "
-                    f"({type(exc).__name__}): {exc}"
-                ),
-            ) from exc
+                content={
+                    "error": "strategy_generation_failed",
+                    "phase": phase,
+                    "exception": error_type,
+                    "message": error_message,
+                    "detail": f"{phase}: {error_type}: {error_message}",
+                },
+            )
         return {"user_id": user_id, "strategy": result, "already_generated": False}
 
     @router.post("/request", status_code=status.HTTP_202_ACCEPTED)
