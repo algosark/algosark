@@ -12,7 +12,7 @@ def notify_admin_new_account(user) -> None:
     token = create_action_token(user.id, "admin_generate_strategy", timedelta(days=30))
     link = (
         f"{os.getenv('FRONTEND_URL', 'http://localhost:8000')}"
-        f"/admin-generate-strategy.html#token={token}"
+        f"/admin-generate-strategy.html?token={token}"
     )
     send_email(
         admin_email,
