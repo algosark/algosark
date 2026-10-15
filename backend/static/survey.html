@@ -1352,7 +1352,8 @@
       if (countEl) countEl.textContent = secondsLeft;
       if (secondsLeft <= 0) {
         clearInterval(timer);
-        window.location.href = 'dashboard.html';
+        const returnToStrategy = new URLSearchParams(window.location.search).get('return_to') === 'strategy';
+        window.location.href = returnToStrategy ? 'dashboard.html?view=strategy' : 'dashboard.html';
       }
     }, 1000);
   }

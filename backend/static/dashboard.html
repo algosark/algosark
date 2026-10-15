@@ -2404,7 +2404,8 @@ async function requestStrategy() {
     showToast('success', 'Strategy requested', "Our team will build, backtest, and email you once it's ready — usually within 48 hours.");
     loadStrategy();
   } else if (httpStatus === 400) {
-    showToast('error', 'Survey required', data?.detail || 'Complete the eligibility & risk survey first.');
+    window.location.assign('/survey.html?return_to=strategy');
+    return;
   } else if (httpStatus === 409) {
     showToast('error', 'Strategy already exists', data?.detail || 'A strategy has already been generated for your account.');
     loadStrategy();
@@ -2604,6 +2605,8 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
 
   await refreshBrokerStatus();
+  const requestedView = new URLSearchParams(window.location.search).get('view');
+  if (requestedView === 'strategy') showView('strategy');
   await loadBrokerProviders();
 
   // Instant paint from cache, then reconcile with the server.
